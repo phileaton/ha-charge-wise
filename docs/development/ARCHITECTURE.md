@@ -1,21 +1,21 @@
 # Architecture Overview
 
-This document describes the technical architecture of the Integration Blueprint custom component for Home Assistant.
+This document describes the technical architecture of the Charge Wise custom component for Home Assistant.
 
 ## Directory Structure
 
 ```text
-custom_components/ha_integration_domain/
+custom_components/charge_wise/
 ├── __init__.py              # Integration setup and unload
 ├── config_flow.py           # Config flow entry point
 ├── const.py                 # Constants and configuration keys
 ├── coordinator/             # Data update coordinator package
-│   ├── __init__.py          # Exports IntegrationBlueprintDataUpdateCoordinator
+│   ├── __init__.py          # Exports ChargeWiseDataUpdateCoordinator
 │   └── base.py              # Main coordinator class
 ├── data.py                  # Data classes and type definitions
 ├── diagnostics.py           # Diagnostic data for troubleshooting
 ├── entity/                  # Base entity package
-│   ├── __init__.py          # Exports IntegrationBlueprintEntity
+│   ├── __init__.py          # Exports ChargeWiseEntity
 │   └── base.py              # Base entity class implementation
 ├── icons.json               # Entity and service action icons
 ├── manifest.json            # Integration metadata
@@ -64,7 +64,7 @@ entity, so no entity ever calls the API itself.
 - Translation of API client exceptions into `ConfigEntryAuthFailed` and `UpdateFailed`
 - Raising and clearing the repair issue for the deprecated API version
 
-**Key class:** `IntegrationBlueprintDataUpdateCoordinator` (exported from `coordinator/__init__.py`)
+**Key class:** `ChargeWiseDataUpdateCoordinator` (exported from `coordinator/__init__.py`)
 
 Retries and backoff are **not** implemented here. Home Assistant already retries `UpdateFailed`
 with exponential backoff, and failures are logged by Home Assistant, not by the coordinator.
@@ -86,7 +86,7 @@ Handles all communication with external APIs or devices. Implements:
 - Authentication handling
 - Error translation to custom exceptions
 
-**Key class:** `IntegrationBlueprintApiClient`
+**Key class:** `ChargeWiseApiClient`
 
 ### Config Flow
 
@@ -114,8 +114,8 @@ need one; see [`ha-config-flow`](../../.agents/skills/ha-config-flow/SKILL.md).
 
 **Key classes:**
 
-- `IntegrationBlueprintConfigFlowHandler` (main flow)
-- `IntegrationBlueprintOptionsFlow` (options)
+- `ChargeWiseConfigFlowHandler` (main flow)
+- `ChargeWiseOptionsFlow` (options)
 
 ### Base Entity
 
@@ -128,7 +128,7 @@ Provides common functionality for all entities in the integration:
 - Coordinator integration
 - Availability tracking
 
-**Key class:** `IntegrationBlueprintEntity` (in `entity/base.py`)
+**Key class:** `ChargeWiseEntity` (in `entity/base.py`)
 
 ## Platform Organization
 
@@ -143,7 +143,7 @@ Each platform (sensor, binary_sensor, switch, etc.) follows this pattern:
 Platform entities inherit from both:
 
 1. Home Assistant platform base (e.g., `SensorEntity`)
-2. `IntegrationBlueprintEntity` for common functionality
+2. `ChargeWiseEntity` for common functionality
 
 ## Data Flow
 
@@ -204,9 +204,9 @@ To add new functionality:
 
 ### Adding a New Platform
 
-1. Create directory: `custom_components/ha_integration_domain/<platform>/`
+1. Create directory: `custom_components/charge_wise/<platform>/`
 2. Implement `__init__.py` with `async_setup_entry()`
-3. Create entity classes inheriting from platform base + `IntegrationBlueprintEntity`
+3. Create entity classes inheriting from platform base + `ChargeWiseEntity`
 4. Add platform to `PLATFORMS` in `__init__.py`
 
 ### Adding a New Service Action

@@ -1,4 +1,4 @@
-"""Shared fixtures for the ha_integration_domain tests."""
+"""Shared fixtures for the charge_wise tests."""
 
 from collections.abc import Generator
 from typing import Any
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ha_integration_domain.const import DOMAIN
+from custom_components.charge_wise.const import DOMAIN
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
@@ -24,7 +24,7 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
 def mock_api() -> Generator[AsyncMock]:
     """Replace the client's HTTP layer, keeping its payload logic under test."""
     with patch(
-        "custom_components.ha_integration_domain.api.client.IntegrationBlueprintApiClient._api_wrapper",
+        "custom_components.charge_wise.api.client.ChargeWiseApiClient._api_wrapper",
         new_callable=AsyncMock,
         return_value=API_RESPONSE,
     ) as api_wrapper:

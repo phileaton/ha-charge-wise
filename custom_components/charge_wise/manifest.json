@@ -1,0 +1,14 @@
+{
+  "domain": "charge_wise",
+  "name": "Charge Wise",
+  "codeowners": [
+    "@phileaton"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/phileaton/ha-charge-wise",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/phileaton/ha-charge-wise/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
