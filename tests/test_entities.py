@@ -122,3 +122,20 @@ async def test_battery_protection_entity_is_omitted_without_a_battery_sensor(
         )
         is None
     )
+
+
+async def test_battery_protection_entity_is_removed_when_the_battery_sensor_is_removed(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Dropping the battery sensor from the options removes its stale registry entry."""
+    registry = er.async_get(hass)
+    unique_id = f"{init_integration.entry_id}_battery_protection"
+    assert registry.async_get_entity_id("binary_sensor", DOMAIN, unique_id) is not None
+
+    options = dict(init_integration.options)
+    options.pop(CONF_BATTERY_POWER_ENTITY)
+    hass.config_entries.async_update_entry(init_integration, options=options)
+    await hass.async_block_till_done()
+
+    assert registry.async_get_entity_id("binary_sensor", DOMAIN, unique_id) is None

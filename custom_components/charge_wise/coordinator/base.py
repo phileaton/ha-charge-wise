@@ -64,7 +64,6 @@ _POWER_FACTORS: dict[str, float] = {
     UnitOfPower.MILLIWATT: 0.001,
     UnitOfPower.WATT: 1.0,
     UnitOfPower.KILO_WATT: 1000.0,
-    UnitOfPower.MEGA_WATT: 1_000_000.0,
 }
 
 
