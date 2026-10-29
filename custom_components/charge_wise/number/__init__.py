@@ -20,6 +20,5 @@ async def async_setup_entry(
 ) -> None:
     """Set up the number platform."""
     async_add_entities(
-        ChargeWiseHumidityNumber(entry.runtime_data.coordinator, description)
-        for description in ENTITY_DESCRIPTIONS
+        ChargeWiseHumidityNumber(entry.runtime_data.coordinator, description) for description in ENTITY_DESCRIPTIONS
     )
