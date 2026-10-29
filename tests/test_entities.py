@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ha_integration_domain.api import IntegrationBlueprintApiClientError
+from custom_components.charge_wise.api import ChargeWiseApiClientError
 from homeassistant.components.fan import DOMAIN as FAN_DOMAIN, SERVICE_SET_PERCENTAGE
 from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
@@ -54,7 +54,7 @@ async def test_write_failure_raises_translated_error(
     mock_api: AsyncMock,
 ) -> None:
     """A failing device call surfaces as a translated HomeAssistantError."""
-    mock_api.side_effect = IntegrationBlueprintApiClientError("boom")
+    mock_api.side_effect = ChargeWiseApiClientError("boom")
 
     with pytest.raises(HomeAssistantError) as err:
         await hass.services.async_call(
@@ -73,7 +73,7 @@ async def test_entities_go_unavailable_when_the_poll_fails(
     mock_api: AsyncMock,
 ) -> None:
     """A failed refresh makes the entities unavailable rather than stale."""
-    mock_api.side_effect = IntegrationBlueprintApiClientError("boom")
+    mock_api.side_effect = ChargeWiseApiClientError("boom")
 
     await init_integration.runtime_data.coordinator.async_refresh()
     await hass.async_block_till_done()

@@ -1,7 +1,7 @@
 # Examples
 
 This page provides ready-to-use examples for automations, dashboards, and blueprints
-with the Integration Blueprint custom integration.
+with the Charge Wise custom integration.
 
 Replace entity IDs like `sensor.device_name_*` with your actual entity IDs after
 setting up the integration.
@@ -50,7 +50,7 @@ automation:
       - trigger: time
         at: "03:00:00"
     action:
-      - action: ha_integration_domain.refresh_data
+      - action: charge_wise.refresh_data
         data:
           config_entry_id: 01JG3T2Q6Z9K4V8P0N5R7X2M1A
 ```
@@ -61,7 +61,7 @@ Save this as a blueprint file and import it in Home Assistant:
 
 ```yaml
 blueprint:
-  name: Integration Blueprint — Threshold Alert
+  name: Charge Wise — Threshold Alert
   description: Send a notification when a sensor exceeds a configurable threshold.
   domain: automation
   input:
@@ -70,7 +70,7 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: ha_integration_domain
+          integration: charge_wise
     threshold:
       name: Threshold value
       selector:
@@ -156,4 +156,4 @@ hours_to_show: 24
 
 - [Configuration Reference](./CONFIGURATION.md) - All configuration options
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
-- [GitHub Issues](https://github.com/jpawlowski/hacs.integration_blueprint/issues) - Report problems
+- [GitHub Issues](https://github.com/phileaton/ha-charge-wise/issues) - Report problems

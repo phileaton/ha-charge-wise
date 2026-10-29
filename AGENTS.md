@@ -10,25 +10,13 @@ does not; this project's identity, layering, workflow policy and traps do.
 
 ## Which repository is this?
 
-`initialize.sh` is present, so **this repository has not been initialised yet** — the domain, class prefix and
-directory names below are still the template's placeholders. The script replaces them across the whole repository and
-then deletes itself, and template sync never restores it. **Its absence, not any wording here, is what marks an
-initialised integration.**
+**This is an initialised Home Assistant integration repository.** It was created from the
+[hacs.integration_blueprint](https://github.com/jpawlowski/hacs.integration_blueprint) template and personalised by
+`initialize.sh`, which has already run and removed itself. It is not a blueprint — the integration is the product, and
+guidance about maintaining the template does not apply here.
 
-Two kinds of repository are in this state, and they are byte-identical — nothing in the working tree tells them apart:
-
-- **The upstream template.** The placeholders are permanent here, and the example integration is itself the thing
-  being maintained. Every change ships to every downstream repository through the weekly template-sync pull request,
-  so skills and instruction files must use the `<domain>` and `{ClassPrefix}` placeholders rather than the concrete
-  identifiers, and [`blueprint-skill-maintenance`](.agents/skills/blueprint-skill-maintenance/SKILL.md) governs the
-  shipped skill set.
-- **A fresh copy** made with GitHub's "Use this template" button, which still has to be initialised. **Do not write
-  integration code first** — `initialize.sh` would overwrite it. Run `./initialize.sh`, then
-  [`blueprint-scaffold`](.agents/skills/blueprint-scaffold/SKILL.md); when existing integration code is being migrated
-  in, [`blueprint-import`](.agents/skills/blueprint-import/SKILL.md) covers the order instead.
-
-When the request does not make clear which of the two this is, ask. **Do not infer it from the git remote** — a
-contributor's fork of the template is not a copy awaiting initialisation.
+Template sync still delivers upstream improvements to shared files; `.templatesyncignore` lists what it must never
+touch. See [`blueprint-tooling`](.agents/skills/blueprint-tooling/SKILL.md).
 
 <!-- repo-role:end -->
 
@@ -36,14 +24,14 @@ contributor's fork of the template is not a copy awaiting initialisation.
 
 **Identity — use these everywhere, never a variant:**
 
-- **Domain:** `ha_integration_domain`
-- **Title:** Integration Blueprint
-- **Class prefix:** `IntegrationBlueprint`
-- **Repository:** jpawlowski/hacs.integration_blueprint
+- **Domain:** `charge_wise`
+- **Title:** Charge Wise
+- **Class prefix:** `ChargeWise`
+- **Repository:** phileaton/ha-charge-wise
 
 **Key directories:**
 
-- `custom_components/ha_integration_domain/` — integration code
+- `custom_components/charge_wise/` — integration code
 - `config/` — Home Assistant configuration for local testing
 - `tests/` — mirrors the integration structure
 - `script/` — development and validation scripts
