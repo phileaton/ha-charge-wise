@@ -20,6 +20,5 @@ async def async_setup_entry(
 ) -> None:
     """Set up the select platform."""
     async_add_entities(
-        ChargeWiseFanSpeedSelect(entry.runtime_data.coordinator, description)
-        for description in ENTITY_DESCRIPTIONS
+        ChargeWiseFanSpeedSelect(entry.runtime_data.coordinator, description) for description in ENTITY_DESCRIPTIONS
     )

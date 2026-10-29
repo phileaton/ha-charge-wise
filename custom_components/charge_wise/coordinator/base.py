@@ -2,10 +2,7 @@
 
 from typing import TYPE_CHECKING, Any
 
-from custom_components.charge_wise.api import (
-    ChargeWiseApiClientAuthenticationError,
-    ChargeWiseApiClientError,
-)
+from custom_components.charge_wise.api import ChargeWiseApiClientAuthenticationError, ChargeWiseApiClientError
 from custom_components.charge_wise.const import DOMAIN
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed

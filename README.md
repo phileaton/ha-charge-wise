@@ -55,7 +55,7 @@ Uncomment and customize these badges if you want to use them:
 
 Click the button below to open the integration directly in HACS:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jpawlowski&repository=ha-charge-wise&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=phileaton&repository=ha-charge-wise&category=integration)
 
 Then:
 
@@ -420,7 +420,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 [maintenance-shield]: https://img.shields.io/badge/maintainer-%40phileaton-blue.svg?style=for-the-badge
 [releases-shield]: https://img.shields.io/github/release/phileaton/ha-charge-wise.svg?style=for-the-badge
 [releases]: https://github.com/phileaton/ha-charge-wise/releases
-[user_profile]: https://github.com/jpawlowski
+[user_profile]: https://github.com/phileaton
 
 <!-- Optional badge definitions - uncomment if needed:
 [buymecoffee]: https://www.buymeacoffee.com/jpawlowski
