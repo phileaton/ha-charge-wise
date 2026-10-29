@@ -24,12 +24,10 @@ any of it in your own repository, see [`../README.md`](../README.md). This file 
 | [`ha-release`](ha-release/SKILL.md)                     | cutting a release, commit messages, changelog, release notes              |
 | [`ha-issue-triage`](ha-issue-triage/SKILL.md)           | working through the GitHub issue backlog via branch + PR                  |
 | [`blueprint-tooling`](blueprint-tooling/SKILL.md)       | validation scripts, hook scripts, dependencies, template sync             |
-| [`blueprint-scaffold`](blueprint-scaffold/SKILL.md)     | turning the fresh template into an integration for one real device        |
 | [`blueprint-import`](blueprint-import/SKILL.md)         | migrating an existing custom integration into this repository             |
 
-`blueprint-scaffold` and `blueprint-import` are one-time skills: each ends with a step that removes itself once its
-job is done. Leaving them in place costs context in every later session.
-
+`blueprint-import` is a one-time skill: it removes itself once its job is done. Leaving it in place costs context in
+every later session.
 
 ## Naming
 

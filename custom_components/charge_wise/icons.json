@@ -1,39 +1,38 @@
 {
   "entity": {
-    "sensor": {
-      "filter_life": {
-        "default": "mdi:air-filter"
-      }
-    },
-    "switch": {
-      "child_lock": {
-        "default": "mdi:lock",
-        "state": {
-          "off": "mdi:lock-open-variant"
-        }
-      },
-      "led_display": {
-        "default": "mdi:led-on",
-        "state": {
-          "off": "mdi:led-off"
-        }
-      }
-    },
     "select": {
-      "fan_speed": {
-        "default": "mdi:fan",
+      "mode": {
+        "default": "mdi:ev-station",
         "state": {
-          "low": "mdi:fan-speed-1",
-          "medium": "mdi:fan-speed-2",
-          "high": "mdi:fan-speed-3",
-          "auto": "mdi:fan-auto"
+          "off": "mdi:power-off",
+          "manual": "mdi:hand",
+          "solar": "mdi:solar-power"
         }
       }
-    }
-  },
-  "services": {
-    "refresh_data": {
-      "service": "mdi:refresh"
+    },
+    "number": {
+      "manual_current": {
+        "default": "mdi:current-ac"
+      }
+    },
+    "sensor": {
+      "controller_status": {
+        "default": "mdi:state-machine"
+      },
+      "available_solar_budget": {
+        "default": "mdi:solar-power"
+      },
+      "requested_current": {
+        "default": "mdi:current-ac"
+      },
+      "decision_reason": {
+        "default": "mdi:comment-question-outline"
+      }
+    },
+    "binary_sensor": {
+      "battery_protection": {
+        "default": "mdi:battery-alert-variant-outline"
+      }
     }
   }
 }

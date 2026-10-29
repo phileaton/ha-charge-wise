@@ -1,0 +1,21 @@
+views:
+  - title: Charge Wise
+    path: charge-wise
+    cards:
+      - type: entities
+        title: Garage Charger
+        show_header_toggle: false
+        entities:
+          - entity: select.garage_charger_mode
+          - entity: number.garage_charger_manual_current
+          - entity: sensor.garage_charger_controller_status
+          - entity: sensor.garage_charger_requested_current
+          - entity: sensor.garage_charger_available_solar_budget
+          - entity: sensor.garage_charger_decision_reason
+          - entity: binary_sensor.garage_charger_battery_protection
+      - type: history-graph
+        title: Charging controller
+        hours_to_show: 24
+        entities:
+          - entity: sensor.garage_charger_requested_current
+          - entity: sensor.garage_charger_available_solar_budget

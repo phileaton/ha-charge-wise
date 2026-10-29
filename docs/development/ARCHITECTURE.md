@@ -1,4 +1,4 @@
-# Architecture Overview
+a# Architecture Overview
 
 This document describes the technical architecture of the Charge Wise custom component for Home Assistant.
 

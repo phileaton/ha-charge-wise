@@ -1,191 +1,55 @@
-# Getting Started with Charge Wise
+# Getting Started
 
-This guide will help you install and set up the Charge Wise custom integration for Home Assistant.
+Charge Wise adjusts one EV charger's current target using entities that already exist in Home Assistant. It does not
+connect to a charger vendor API.
 
-## Prerequisites
+## Before setup
 
-- Home Assistant 2025.7.0 or newer
-- HACS (Home Assistant Community Store) installed
-- Network connectivity to [external service/device]
+Have these Home Assistant entities available:
 
-## Installation
+- A net grid-power sensor in mW, W, or kW. Import must be positive and export negative.
+- A measured charger-power sensor in mW, W, or kW.
+- The charger's on/off switch.
+- A writable number entity for the active charging-current target, in amperes.
+- A safe maximum current for this charger. You must enter this value even when you select a hardware-maximum entity.
 
-### Via HACS (Recommended)
+Optional inputs:
 
-1. Open HACS in your Home Assistant instance
-2. Go to "Integrations"
-3. Click the three dots in the top right corner
-4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/phileaton/ha-charge-wise`
-6. Set category to "Integration"
-7. Click "Add"
-8. Find "Charge Wise" in the integration list
-9. Click "Download"
-10. Restart Home Assistant
+- A battery-power sensor. Its sign convention is configurable; positive discharge is the default.
+- A binary sensor that is on when an EV is connected. If selected, Charge Wise holds charging unless it reports the EV
+  connected.
+- A read-only number entity for the charger's hardware maximum current. Charge Wise applies the lower of this value
+  and the configured maximum; if the entity is unavailable, the configured maximum remains in force.
 
-### Manual Installation
+Without a battery sensor, battery-discharge protection is disabled. Without an EV-connected sensor, Charge Wise cannot
+detect unplugging.
 
-1. Download the latest release from the [releases page](https://github.com/phileaton/ha-charge-wise/releases)
-2. Extract the `charge_wise` folder from the archive
-3. Copy it to `custom_components/charge_wise/` in your Home Assistant configuration directory
-4. Restart Home Assistant
+## Install
 
-## Initial Setup
+Install Charge Wise through HACS as a custom integration, or copy `custom_components/charge_wise` into the
+`custom_components` directory in your Home Assistant configuration and restart Home Assistant. Home Assistant
+2026.10.0 or newer is required.
 
-After installation, add the integration:
+## Add the integration
 
-1. Go to **Settings** → **Devices & Services**
-2. Click **+ Add Integration**
-3. Search for "Charge Wise"
-4. Follow the configuration steps:
+1. Open Home Assistant's integration setup flow and find **Charge Wise**. It is classified as a calculated helper,
+   not a physical device.
+2. Select **Charge Wise**.
+3. Select the grid-power sensor, charger-power sensor, charger switch, and writable current target.
+4. Enter a safe maximum current and review the operating limits and Solar defaults.
+5. Add the optional battery and EV-connected sensors if you want those protections.
+6. Submit the form. The new entry starts in **Off** mode.
 
-### Step 1: Connection Information
+The setup form validates selected entity domains, available power units, safe current limits, and duplicate charger
+controls. Multiple entries may share measurement sensors, but not the same charger switch or active current target.
 
-Enter the required connection details:
+## Start carefully
 
-- **Host/IP Address:** The hostname or IP address of your device/service
-- **API Key/Token:** Your authentication credentials (if applicable)
-- **Port:** Connection port (default: 8080)
+1. Confirm the selected current-target number controls the intended charger and is measured in amperes.
+2. Confirm import is positive and export is negative on the grid-power sensor.
+3. Keep the mode **Off** while checking the current and hardware limits.
+4. Use **Manual** to request a controlled current, or **Solar** to start only when the configured solar threshold is
+   met.
 
-Click **Submit** to test the connection.
-
-### Step 2: Configuration Options
-
-Configure optional settings:
-
-- **Update Interval:** How often to poll for updates (default: 5 minutes)
-- **Name:** Friendly name for this integration instance
-
-Click **Submit** to complete setup.
-
-## What Gets Created
-
-After successful setup, the integration creates:
-
-### Devices
-
-- **Device Name:** Main device representing your connected service/hardware
-  - Model information
-  - Software version
-  - Configuration URL (link to device web interface)
-
-### Entities
-
-The following entities are automatically created:
-
-#### Sensors
-
-- `sensor.<device_name>_<sensor_name>` - Descriptive sensor measurements
-- More sensors as applicable to your setup
-
-#### Binary Sensors
-
-- `binary_sensor.<device_name>_<sensor_name>` - On/off status indicators
-
-#### Switches
-
-- `switch.<device_name>_<switch_name>` - Controllable on/off switches
-
-#### Other Platforms
-
-Additional entities may be created depending on your device capabilities.
-
-## First Steps
-
-### Dashboard Cards
-
-Add entities to your dashboard:
-
-1. Go to your dashboard
-2. Click **Edit Dashboard** → **Add Card**
-3. Choose card type (e.g., "Entities", "Glance")
-4. Select entities from "Charge Wise"
-
-Example entities card:
-
-```yaml
-type: entities
-title: Charge Wise
-entities:
-  - sensor.device_name_sensor
-  - binary_sensor.device_name_connectivity
-  - switch.device_name_switch
-```
-
-### Automations
-
-Use the integration in automations:
-
-**Example - Trigger on sensor change:**
-
-```yaml
-automation:
-  - alias: "React to sensor value"
-    trigger:
-      - trigger: state
-        entity_id: sensor.device_name_sensor
-    action:
-      - action: notify.notify
-        data:
-          message: "Sensor changed to {{ trigger.to_state.state }}"
-```
-
-**Example - Control switch based on time:**
-
-```yaml
-automation:
-  - alias: "Turn on in morning"
-    trigger:
-      - trigger: time
-        at: "07:00:00"
-    action:
-      - action: switch.turn_on
-        target:
-          entity_id: switch.device_name_switch
-```
-
-## Troubleshooting
-
-### Connection Failed
-
-If setup fails with connection errors:
-
-1. Verify the host/IP address is correct and reachable
-2. Check that the API key/token is valid
-3. Ensure no firewall is blocking the connection
-4. Check Home Assistant logs for detailed error messages
-
-### Entities Not Updating
-
-If entities show "Unavailable" or don't update:
-
-1. Check that the device/service is online
-2. Verify API credentials haven't expired
-3. Review logs: **Settings** → **System** → **Logs**
-4. Try reloading the integration
-
-### Debug Logging
-
-Enable debug logging to troubleshoot issues:
-
-```yaml
-logger:
-  default: warning
-  logs:
-    custom_components.charge_wise: debug
-```
-
-Add this to `configuration.yaml`, restart, and reproduce the issue. Check logs for detailed information.
-
-## Next Steps
-
-- See [CONFIGURATION.md](./CONFIGURATION.md) for detailed configuration options
-- See [EXAMPLES.md](./EXAMPLES.md) for more automation examples
-- Report issues at [GitHub Issues](https://github.com/phileaton/ha-charge-wise/issues)
-
-## Support
-
-For help and discussion:
-
-- [GitHub Discussions](https://github.com/phileaton/ha-charge-wise/discussions)
-- [Home Assistant Community Forum](https://community.home-assistant.io/)
+See [Configuration](./CONFIGURATION.md) for all thresholds and controller behavior, and [Examples](./EXAMPLES.md) for
+automations and an importable dashboard.

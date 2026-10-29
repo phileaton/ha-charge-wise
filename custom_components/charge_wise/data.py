@@ -1,27 +1,10 @@
-"""
-Runtime data types for charge_wise.
+"""Config-entry typing for Charge Wise runtime data."""
 
-Access pattern: entry.runtime_data.client / entry.runtime_data.coordinator
-"""
-
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from custom_components.charge_wise.coordinator.data import ChargeWiseData
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.loader import Integration
-
-    from .api import ChargeWiseApiClient
-    from .coordinator import ChargeWiseDataUpdateCoordinator
-
 
 type ChargeWiseConfigEntry = ConfigEntry[ChargeWiseData]
-
-
-@dataclass
-class ChargeWiseData:
-    """Runtime data stored on the config entry after a successful setup."""
-
-    client: ChargeWiseApiClient
-    coordinator: ChargeWiseDataUpdateCoordinator
-    integration: Integration

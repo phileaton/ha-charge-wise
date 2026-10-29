@@ -1,81 +1,124 @@
-"""Tests for the entities the example integration exposes."""
+"""Tests for Charge Wise entities and state-driven updates."""
 
-from unittest.mock import AsyncMock
+from typing import Any
 
-import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.charge_wise.api import ChargeWiseApiClientError
-from homeassistant.components.fan import DOMAIN as FAN_DOMAIN, SERVICE_SET_PERCENTAGE
-from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
+from custom_components.charge_wise.const import (
+    CONF_BATTERY_POWER_ENTITY,
+    CONF_CHARGER_SWITCH_ENTITY,
+    CONF_CURRENT_TARGET_ENTITY,
+    CONF_HARDWARE_MAXIMUM_ENTITY,
+    DOMAIN,
+)
+from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
 
-async def test_entities_read_the_coordinator_payload(
-    init_integration: MockConfigEntry,
+def _entity_id(hass: HomeAssistant, entry: MockConfigEntry, platform: str, key: str) -> str:
+    """Resolve an integration entity by its stable unique ID."""
+    entity_id = er.async_get(hass).async_get_entity_id(
+        platform,
+        DOMAIN,
+        f"{entry.entry_id}_{key}",
+    )
+    assert entity_id is not None
+    return entity_id
+
+
+def _set_power(hass: HomeAssistant, entity_id: str, value: float, unit: str = "W") -> None:
+    """Set a test power sensor state."""
+    hass.states.async_set(entity_id, str(value), {"unit_of_measurement": unit})
+
+
+async def test_setup_exposes_the_charge_wise_control_surface(
     hass: HomeAssistant,
-) -> None:
-    """Every entity takes its state from the payload the client built."""
-    # seed = 1 * 47 + 1 * 13 = 60
-    assert hass.states.get("sensor.demo_filter_life_remaining").state == "40"
-    assert hass.states.get("binary_sensor.demo_filter_replacement_needed").state == "off"
-    assert hass.states.get("select.demo_fan_speed").state == "auto"
-    assert hass.states.get("switch.demo_child_lock").state == "off"
-    assert hass.states.get("number.demo_target_humidity").state == "50.0"
-
-
-async def test_fan_is_the_main_feature_entity(
     init_integration: MockConfigEntry,
-    hass: HomeAssistant,
 ) -> None:
-    """The fan carries the device name alone, not a repeated name."""
-    state = hass.states.get("fan.demo")
+    """The configured entry creates translated control and diagnostic entities."""
+    select_entity = _entity_id(hass, init_integration, "select", "mode")
+    number_entity = _entity_id(hass, init_integration, "number", "manual_current")
+    status_entity = _entity_id(hass, init_integration, "sensor", "controller_status")
+    solar_entity = _entity_id(hass, init_integration, "sensor", "available_solar_budget")
+    current_entity = _entity_id(hass, init_integration, "sensor", "requested_current")
+    reason_entity = _entity_id(hass, init_integration, "sensor", "decision_reason")
+    battery_entity = _entity_id(hass, init_integration, "binary_sensor", "battery_protection")
 
-    assert state is not None
-    assert state.attributes["friendly_name"] == "demo"
+    assert hass.states.get(select_entity).state == "off"
+    assert float(hass.states.get(number_entity).state) == 6
+    assert hass.states.get(status_entity).state == "off"
+    assert hass.states.get(solar_entity).state == "unknown"
+    assert float(hass.states.get(current_entity).state) == 0
+    assert hass.states.get(reason_entity).state == "off"
+    assert hass.states.get(battery_entity).state == "off"
 
 
-async def test_led_display_is_disabled_by_default(
+async def test_solar_budget_uses_charger_power_and_signed_grid_power(
+    hass: HomeAssistant,
     init_integration: MockConfigEntry,
-    hass: HomeAssistant,
 ) -> None:
-    """The noisy diagnostic switch is not created until the user enables it."""
-    entry = er.async_get(hass).async_get("switch.demo_led_display")
+    """Solar budget is the charger draw less net grid import."""
+    _set_power(hass, "sensor.grid_power", 0.5, "kW")
+    _set_power(hass, "sensor.charger_power", 1.5, "kW")
+    mode_entity = _entity_id(hass, init_integration, "select", "mode")
 
-    assert entry is not None
-    assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
-
-
-async def test_write_failure_raises_translated_error(
-    init_integration: MockConfigEntry,
-    hass: HomeAssistant,
-    mock_api: AsyncMock,
-) -> None:
-    """A failing device call surfaces as a translated HomeAssistantError."""
-    mock_api.side_effect = ChargeWiseApiClientError("boom")
-
-    with pytest.raises(HomeAssistantError) as err:
-        await hass.services.async_call(
-            FAN_DOMAIN,
-            SERVICE_SET_PERCENTAGE,
-            {ATTR_ENTITY_ID: "fan.demo", "percentage": 100},
-            blocking=True,
-        )
-
-    assert err.value.translation_key == "fan_speed_set_failed"
-
-
-async def test_entities_go_unavailable_when_the_poll_fails(
-    init_integration: MockConfigEntry,
-    hass: HomeAssistant,
-    mock_api: AsyncMock,
-) -> None:
-    """A failed refresh makes the entities unavailable rather than stale."""
-    mock_api.side_effect = ChargeWiseApiClientError("boom")
-
-    await init_integration.runtime_data.coordinator.async_refresh()
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": mode_entity, "option": "solar"},
+        blocking=True,
+    )
     await hass.async_block_till_done()
 
-    assert hass.states.get("sensor.demo_filter_life_remaining").state == STATE_UNAVAILABLE
+    solar_entity = _entity_id(hass, init_integration, "sensor", "available_solar_budget")
+    status_entity = _entity_id(hass, init_integration, "sensor", "controller_status")
+    assert float(hass.states.get(solar_entity).state) == 1000
+    assert hass.states.get(status_entity).state == "waiting"
+
+
+async def test_battery_protection_entity_is_omitted_without_a_battery_sensor(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """The conditional binary sensor does not exist when protection is unconfigured."""
+    options: dict[str, Any] = config_entry.options.copy()
+    options.pop(CONF_BATTERY_POWER_ENTITY)
+    options.update(
+        {
+            CONF_CHARGER_SWITCH_ENTITY: "switch.second_charger",
+            CONF_CURRENT_TARGET_ENTITY: "number.second_current",
+            CONF_HARDWARE_MAXIMUM_ENTITY: "number.second_maximum",
+        },
+    )
+    hass.states.async_set("switch.second_charger", "off")
+    hass.states.async_set(
+        "number.second_current",
+        "6",
+        {"unit_of_measurement": UnitOfElectricCurrent.AMPERE},
+    )
+    hass.states.async_set(
+        "number.second_maximum",
+        "32",
+        {"unit_of_measurement": UnitOfElectricCurrent.AMPERE},
+    )
+    hass.states.async_set("sensor.grid_power", "0", {"unit_of_measurement": UnitOfPower.WATT})
+    hass.states.async_set("sensor.charger_power", "0", {"unit_of_measurement": UnitOfPower.WATT})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Second charger",
+        data={},
+        options=options,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert (
+        er.async_get(hass).async_get_entity_id(
+            "binary_sensor",
+            DOMAIN,
+            f"{entry.entry_id}_battery_protection",
+        )
+        is None
+    )

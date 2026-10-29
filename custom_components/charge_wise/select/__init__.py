@@ -1,10 +1,9 @@
-"""Select platform for charge_wise."""
+"""Set up the select platform."""
 
 from typing import TYPE_CHECKING
 
-from .fan_speed import ENTITY_DESCRIPTIONS, ChargeWiseFanSpeedSelect
+from custom_components.charge_wise.select.mode import ENTITY_DESCRIPTION, ChargeWiseModeSelect
 
-# Acts on the device: the coordinator does not limit outbound calls.
 PARALLEL_UPDATES = 1
 
 if TYPE_CHECKING:
@@ -18,7 +17,7 @@ async def async_setup_entry(
     entry: ChargeWiseConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the select platform."""
+    """Set up the operating-mode select entity."""
     async_add_entities(
-        ChargeWiseFanSpeedSelect(entry.runtime_data.coordinator, description) for description in ENTITY_DESCRIPTIONS
+        [ChargeWiseModeSelect(entry.runtime_data.coordinator, ENTITY_DESCRIPTION)],
     )

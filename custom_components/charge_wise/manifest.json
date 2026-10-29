@@ -6,8 +6,8 @@
   ],
   "config_flow": true,
   "documentation": "https://github.com/phileaton/ha-charge-wise",
-  "integration_type": "hub",
-  "iot_class": "cloud_polling",
+  "integration_type": "helper",
+  "iot_class": "calculated",
   "issue_tracker": "https://github.com/phileaton/ha-charge-wise/issues",
   "requirements": [],
   "version": "0.1.0"

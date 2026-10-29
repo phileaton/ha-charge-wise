@@ -78,9 +78,8 @@ agent that implements it. If yours does not, read the `SKILL.md` before starting
 | any Python, YAML, JSON or Markdown file                | —                                                                      | `blueprint.python`, `.yaml`, `.json`, `.markdown`      |
 | commenting any file, in any syntax                     | —                                                                      | `blueprint.comments`                                   |
 
-Two one-time skills exist for a fresh repository and remove themselves as their final step:
-[`blueprint-scaffold`](.agents/skills/blueprint-scaffold/SKILL.md) (turn the template into an integration for one real
-device) and [`blueprint-import`](.agents/skills/blueprint-import/SKILL.md) (migrate an existing integration in).
+One one-time skill remains for a fresh repository:
+[`blueprint-import`](.agents/skills/blueprint-import/SKILL.md) (migrate an existing integration into this repository).
 
 Skills are validated by `script/skills-check` (part of `script/lint-check`, so CI enforces it).
 

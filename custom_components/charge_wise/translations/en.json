@@ -2,150 +2,183 @@
   "config": {
     "step": {
       "user": {
-        "description": "If you need help with the configuration have a look at the [documentation]({documentation_url}).",
+        "title": "Connect charger entities",
+        "description": "Choose the Home Assistant entities Charge Wise will monitor and control.",
         "data": {
-          "username": "Username",
-          "password": "Password"
+          "grid_power_entity": "Net grid power sensor",
+          "charger_power_entity": "Measured charger power sensor",
+          "charger_switch_entity": "Charger on/off switch",
+          "current_target_entity": "Active current target",
+          "hardware_maximum_entity": "Hardware maximum current",
+          "battery_power_entity": "Battery power sensor",
+          "battery_discharge_sign": "Battery discharge sign",
+          "ev_connected_entity": "EV connected sensor",
+          "minimum_current_a": "Minimum operating current",
+          "maximum_current_a": "Safe maximum current",
+          "voltage_v": "Charging voltage",
+          "solar_start_w": "Solar start threshold",
+          "low_solar_confirmation_s": "Low-solar confirmation time",
+          "cooldown_s": "Restart cooldown",
+          "battery_discharge_w": "Battery discharge threshold",
+          "battery_recovery_w": "Battery recovery threshold",
+          "battery_confirmation_s": "Battery protection confirmation time",
+          "battery_recovery_confirmation_s": "Battery recovery confirmation time",
+          "current_deadband_a": "Current adjustment deadband"
         },
         "data_description": {
-          "username": "The account name you use to sign in to the device.",
-          "password": "The password for that account. It is stored encrypted and never written to the log."
-        }
-      },
-      "reconfigure": {
-        "description": "Update the credentials for this integration.",
-        "data": {
-          "username": "Username",
-          "password": "Password"
-        },
-        "data_description": {
-          "username": "The account name you use to sign in to the device.",
-          "password": "The password for that account."
-        }
-      },
-      "reauth_confirm": {
-        "title": "Reauthenticate integration",
-        "description": "The credentials for {username} are no longer valid. Provide updated credentials to restore access.",
-        "data": {
-          "username": "Username",
-          "password": "Password"
-        },
-        "data_description": {
-          "username": "The account name you use to sign in to the device.",
-          "password": "The current password for that account."
+          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
+          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
+          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
+          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
+          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
+          "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
+          "battery_discharge_sign": "Choose whether battery discharge is reported as positive or negative power.",
+          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
+          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
+          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
+          "voltage_v": "Single-phase voltage used to convert available power to current.",
+          "solar_start_w": "Minimum available solar power required to start charging.",
+          "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
+          "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
+          "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
+          "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
+          "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
+          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
         }
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to the server.",
-      "invalid_auth": "The username or password is wrong.",
-      "unknown": "An unknown error occurred."
+      "already_configured": "This charger switch or current target is already used by another Charge Wise entry.",
+      "entity_not_found": "One or more selected entities do not currently exist.",
+      "entity_required": "Choose all required entities.",
+      "invalid_battery_thresholds": "The battery recovery threshold must be lower than the discharge threshold.",
+      "invalid_entity": "Choose an entity from the required domain and use a different number for the current target and hardware maximum.",
+      "invalid_hardware_limit": "The hardware maximum must be a valid current limit at or above the minimum operating current.",
+      "invalid_limits": "The maximum current must be at least the minimum operating current.",
+      "invalid_power_unit": "Power sensors must report mW, W, or kW."
     },
     "abort": {
-      "already_configured": "This entry is already configured.",
-      "reauth_successful": "Reauthentication was successful.",
-      "reconfigure_successful": "Reconfiguration was successful."
+      "already_configured": "This charger is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Configure integration options",
-        "description": "Customize how this integration operates.",
+        "title": "Configure Charge Wise",
+        "description": "Update the selected entities and charging safeguards.",
         "data": {
-          "update_interval_hours": "Update interval (hours)"
+          "grid_power_entity": "Net grid power sensor",
+          "charger_power_entity": "Measured charger power sensor",
+          "charger_switch_entity": "Charger on/off switch",
+          "current_target_entity": "Active current target",
+          "hardware_maximum_entity": "Hardware maximum current",
+          "battery_power_entity": "Battery power sensor",
+          "battery_discharge_sign": "Battery discharge sign",
+          "ev_connected_entity": "EV connected sensor",
+          "minimum_current_a": "Minimum operating current",
+          "maximum_current_a": "Safe maximum current",
+          "voltage_v": "Charging voltage",
+          "solar_start_w": "Solar start threshold",
+          "low_solar_confirmation_s": "Low-solar confirmation time",
+          "cooldown_s": "Restart cooldown",
+          "battery_discharge_w": "Battery discharge threshold",
+          "battery_recovery_w": "Battery recovery threshold",
+          "battery_confirmation_s": "Battery protection confirmation time",
+          "battery_recovery_confirmation_s": "Battery recovery confirmation time",
+          "current_deadband_a": "Current adjustment deadband"
         },
         "data_description": {
-          "update_interval_hours": "How often to fetch the device state, between 0.25 and 24 hours."
+          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
+          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
+          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
+          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
+          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
+          "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
+          "battery_discharge_sign": "Choose whether battery discharge is reported as positive or negative power.",
+          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
+          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
+          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
+          "voltage_v": "Single-phase voltage used to convert available power to current.",
+          "solar_start_w": "Minimum available solar power required to start charging.",
+          "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
+          "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
+          "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
+          "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
+          "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
+          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
         }
       }
     }
   },
   "exceptions": {
-    "authentication_failed": {
-      "message": "Authentication failed during the data update."
+    "invalid_manual_current": {
+      "message": "Current must be between {minimum} A and {maximum} A."
     },
-    "update_failed": {
-      "message": "Failed to fetch data from the device."
-    },
-    "switch_set_failed": {
-      "message": "Failed to change the {name} setting on the device."
-    },
-    "number_set_failed": {
-      "message": "Failed to set the target humidity on the device."
-    },
-    "reset_filter_failed": {
-      "message": "Failed to reset the filter timer on the device."
-    },
-    "fan_speed_set_failed": {
-      "message": "Failed to change the fan speed on the device."
-    },
-    "fan_state_set_failed": {
-      "message": "Failed to turn the fan on or off."
-    },
-    "invalid_fan_speed": {
-      "message": "{speed} is not a fan speed this device supports."
-    },
-    "entry_not_found": {
-      "message": "No configuration entry of this integration matches {target}."
-    },
-    "entry_not_loaded": {
-      "message": "The configuration entry {target} is not loaded, so it cannot be refreshed."
+    "legacy_entry": {
+      "message": "This entry uses the removed demo configuration. Remove it and add Charge Wise again with your charger entities."
     }
   },
   "entity": {
-    "sensor": {
-      "filter_life": {
-        "name": "Filter life remaining"
-      },
-      "runtime": {
-        "name": "Total runtime"
-      }
-    },
-    "binary_sensor": {
-      "filter_replacement": {
-        "name": "Filter replacement needed"
-      }
-    },
-    "switch": {
-      "child_lock": {
-        "name": "Child lock"
-      },
-      "led_display": {
-        "name": "LED display"
-      }
-    },
     "select": {
-      "fan_speed": {
-        "name": "Fan speed",
+      "mode": {
+        "name": "Mode",
         "state": {
-          "low": "Low",
-          "medium": "Medium",
-          "high": "High",
-          "auto": "Auto"
+          "off": "Off",
+          "manual": "Manual",
+          "solar": "Solar"
         }
       }
     },
     "number": {
-      "target_humidity": {
-        "name": "Target humidity"
+      "manual_current": {
+        "name": "Manual current"
       }
     },
-    "button": {
-      "reset_filter": {
-        "name": "Reset filter timer"
-      }
-    }
-  },
-  "services": {
-    "refresh_data": {
-      "name": "Refresh data",
-      "description": "Fetches the current device state immediately instead of waiting for the next poll.",
-      "fields": {
-        "config_entry_id": {
-          "name": "Integration entry",
-          "description": "The configuration entry to refresh."
+    "sensor": {
+      "controller_status": {
+        "name": "Controller status",
+        "state": {
+          "off": "Off",
+          "waiting": "Waiting",
+          "charging": "Charging",
+          "paused": "Paused",
+          "error": "Error"
         }
+      },
+      "available_solar_budget": {
+        "name": "Available solar budget"
+      },
+      "requested_current": {
+        "name": "Requested current"
+      },
+      "decision_reason": {
+        "name": "Decision reason",
+        "state": {
+          "off": "Controller is off",
+          "manual": "Manual mode is active",
+          "solar_waiting": "Waiting for the solar start threshold",
+          "cooldown": "Waiting for the restart cooldown",
+          "grid_unavailable": "Grid power is unavailable or invalid",
+          "charger_power_unavailable": "Charger power is unavailable or invalid",
+          "battery_unavailable": "Configured battery power is unavailable or invalid",
+          "ev_status_unavailable": "Configured EV connection status is unavailable",
+          "ev_disconnected": "The EV is not connected",
+          "battery_confirming": "Confirming battery discharge before protection",
+          "battery_protection": "Battery discharge protection is active",
+          "battery_recovery": "Confirming battery recovery",
+          "low_solar_confirming": "Confirming low solar power",
+          "low_solar": "Charging stopped because solar power remained low",
+          "solar_charging": "Charging from available solar power",
+          "hardware_limit": "The hardware limit is below the minimum operating current",
+          "control_failed": "A charger command failed"
+        }
+      }
+    },
+    "binary_sensor": {
+      "battery_protection": {
+        "name": "Battery protection active"
       }
     }
   }

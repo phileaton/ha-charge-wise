@@ -1,9 +1,9 @@
-"""Sensor entity for charge_wise."""
+"""Shared coordinator-backed sensor entity."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
+from custom_components.charge_wise.coordinator.data import ChargeWiseSnapshot
 from custom_components.charge_wise.entity import ChargeWiseEntity
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.helpers.typing import StateType
@@ -11,17 +11,17 @@ from homeassistant.helpers.typing import StateType
 
 @dataclass(frozen=True, kw_only=True)
 class ChargeWiseSensorEntityDescription(SensorEntityDescription):
-    """Describes a sensor and how to read it from coordinator data."""
+    """Describe how a sensor reads the coordinator snapshot."""
 
-    value_fn: Callable[[dict[str, Any]], StateType]
+    value_fn: Callable[[ChargeWiseSnapshot], StateType]
 
 
 class ChargeWiseSensor(SensorEntity, ChargeWiseEntity):
-    """Sensor backed by one value in the coordinator payload."""
+    """Expose one value from the coordinator snapshot."""
 
     entity_description: ChargeWiseSensorEntityDescription
 
     @property
     def native_value(self) -> StateType:
-        """Return the value read from coordinator data."""
+        """Return the snapshot value selected by the entity description."""
         return self.entity_description.value_fn(self.coordinator.data)

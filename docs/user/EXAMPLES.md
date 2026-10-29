@@ -1,159 +1,76 @@
 # Examples
 
-This page provides ready-to-use examples for automations, dashboards, and blueprints
-with the Charge Wise custom integration.
-
-Replace entity IDs like `sensor.device_name_*` with your actual entity IDs after
-setting up the integration.
+These examples assume the Charge Wise entry is named **Garage Charger**. Replace the sample entity IDs with the IDs
+shown in your Home Assistant entity picker.
 
 ## Automations
 
-### Notify when a sensor exceeds a threshold
+### Select Solar mode when the EV connects
+
+Use the same EV-connected binary sensor selected in the Charge Wise configuration:
 
 ```yaml
-automation:
-  - alias: "Alert when sensor is high"
-    trigger:
-      - trigger: numeric_state
-        entity_id: sensor.device_name_air_quality
-        above: 100
-    action:
-      - action: notify.notify
-        data:
-          title: "Air quality alert"
-          message: "Sensor value exceeded 100!"
-```
-
-### Turn on a switch when connectivity is lost
-
-```yaml
-automation:
-  - alias: "React to connectivity loss"
-    trigger:
-      - trigger: state
-        entity_id: binary_sensor.device_name_connectivity
-        to: "off"
-        for:
-          minutes: 5
-    action:
-      - action: switch.turn_off
-        target:
-          entity_id: switch.device_name_switch
-```
-
-### Call a service action on schedule
-
-```yaml
-automation:
-  - alias: "Refresh the data every morning"
-    trigger:
-      - trigger: time
-        at: "03:00:00"
-    action:
-      - action: charge_wise.refresh_data
-        data:
-          config_entry_id: 01JG3T2Q6Z9K4V8P0N5R7X2M1A
-```
-
-### Use a blueprint for threshold alerts
-
-Save this as a blueprint file and import it in Home Assistant:
-
-```yaml
-blueprint:
-  name: Charge Wise — Threshold Alert
-  description: Send a notification when a sensor exceeds a configurable threshold.
-  domain: automation
-  input:
-    sensor_entity:
-      name: Sensor
-      selector:
-        entity:
-          domain: sensor
-          integration: charge_wise
-    threshold:
-      name: Threshold value
-      selector:
-        number:
-          min: 0
-          max: 1000
-    notify_target:
-      name: Notification service
-      default: notify.notify
-      selector:
-        text:
-
-trigger:
-  - trigger: numeric_state
-    entity_id: !input sensor_entity
-    above: !input threshold
-
-action:
-  - action: !input notify_target
+alias: Use solar charging when the EV connects
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.ev_connected
+    to: "on"
+actions:
+  - action: select.select_option
+    target:
+      entity_id: select.garage_charger_mode
     data:
-      message: >-
-        {{ state_attr(trigger.entity_id, 'friendly_name') }}
-        exceeded {{ threshold }} (current value: {{ trigger.to_state.state }}).
+      option: solar
+mode: single
 ```
 
-## Dashboard Cards
+### Schedule a Manual charging window
 
-### Sensor value card
+This example requests 12 A in Manual mode from 01:00 to 05:00. Choose a current and schedule suitable for your
+installation. This is a fixed schedule; Charge Wise does not compare tariffs or electricity prices.
 
 ```yaml
-type: sensor
-entity: sensor.device_name_air_quality
-name: Air Quality
-graph: line
+alias: Charge manually overnight
+triggers:
+  - trigger: time
+    at: "01:00:00"
+actions:
+  - action: number.set_value
+    target:
+      entity_id: number.garage_charger_manual_current
+    data:
+      value: 12
+  - action: select.select_option
+    target:
+      entity_id: select.garage_charger_mode
+    data:
+      option: manual
+mode: single
 ```
 
-### Device summary — entities card
+Create a second automation to return the controller to Off:
 
 ```yaml
-type: entities
-title: My Device
-entities:
-  - entity: sensor.device_name_air_quality
-    name: Air Quality
-  - entity: binary_sensor.device_name_connectivity
-    name: Connected
-  - entity: binary_sensor.device_name_filter
-    name: Filter Status
-  - entity: switch.device_name_switch
-    name: Power
-  - entity: select.device_name_fan_speed
-    name: Fan Speed
-  - entity: number.device_name_threshold
-    name: Threshold
+alias: Stop the overnight charging window
+triggers:
+  - trigger: time
+    at: "05:00:00"
+actions:
+  - action: select.select_option
+    target:
+      entity_id: select.garage_charger_mode
+    data:
+      option: off
+mode: single
 ```
 
-### Status badge — multiple entities
+## Dashboard
 
-```yaml
-type: glance
-title: Device Status
-entities:
-  - entity: binary_sensor.device_name_connectivity
-    name: Online
-  - entity: sensor.device_name_air_quality
-    name: Air Quality
-  - entity: binary_sensor.device_name_filter
-    name: Filter
-show_state: true
-```
+An importable dashboard using standard Home Assistant cards is in [charge_wise_dashboard.yaml](./charge_wise_dashboard.yaml).
+Update its sample entity IDs after adding the integration. Remove the battery-protection entity from the dashboard if
+you did not configure a battery sensor.
 
-### History graph
+## Related documentation
 
-```yaml
-type: history-graph
-title: Air Quality (last 24 h)
-entities:
-  - entity: sensor.device_name_air_quality
-hours_to_show: 24
-```
-
-## Related Documentation
-
-- [Configuration Reference](./CONFIGURATION.md) - All configuration options
-- [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
-- [GitHub Issues](https://github.com/phileaton/ha-charge-wise/issues) - Report problems
+- [Configuration](./CONFIGURATION.md) describes the available safeguards and options.
+- [Getting Started](./GETTING_STARTED.md) covers setup and safe initial operation.

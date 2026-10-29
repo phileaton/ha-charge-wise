@@ -69,6 +69,9 @@ CLAUDE.md
 # This one is only meaningful inside the blueprint repository itself.
 # initialize.sh deletes it; this entry stops the sync from reinstating it.
 .agents/skills/blueprint-skill-maintenance/
+.agents/skills/blueprint-scaffold/
+# This test only applies before initialize.sh is removed.
+script/tests/test_initialize.py
 #
 # Skills YOU add are never touched — template sync only overwrites files that
 # changed upstream, and a directory the blueprint does not have is not one of

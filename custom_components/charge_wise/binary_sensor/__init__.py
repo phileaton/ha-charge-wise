@@ -1,10 +1,12 @@
-"""Binary sensor platform for charge_wise."""
+"""Set up the binary sensor platform."""
 
 from typing import TYPE_CHECKING
 
-from .filter import ENTITY_DESCRIPTIONS, ChargeWiseFilterSensor
+from custom_components.charge_wise.binary_sensor.battery_protection import (
+    ENTITY_DESCRIPTION,
+    ChargeWiseBatteryProtectionBinarySensor,
+)
 
-# Read-only platform: the coordinator already serializes the fetch.
 PARALLEL_UPDATES = 0
 
 if TYPE_CHECKING:
@@ -18,7 +20,9 @@ async def async_setup_entry(
     entry: ChargeWiseConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the binary_sensor platform."""
-    async_add_entities(
-        ChargeWiseFilterSensor(entry.runtime_data.coordinator, description) for description in ENTITY_DESCRIPTIONS
-    )
+    """Create the battery-protection entity when its source is configured."""
+    coordinator = entry.runtime_data.coordinator
+    if coordinator.battery_configured:
+        async_add_entities(
+            [ChargeWiseBatteryProtectionBinarySensor(coordinator, ENTITY_DESCRIPTION)],
+        )
