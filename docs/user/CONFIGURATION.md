@@ -59,8 +59,13 @@ will still reach its target by sunset. Set all four of these in the setup or opt
 
 - **Solar forecast remaining today**: an energy sensor in Wh, kWh or MWh, such as Forecast.Solar.
 - **Battery level**: a percent sensor.
-- **Average house consumption**: a power sensor, excluding the charger.
+- **House power**: a sensor with the current house consumption, excluding the charger.
 - **Battery capacity (kWh)**.
+
+Charge Wise learns your consumption from the house power sensor: a time-weighted moving average per hour of day,
+seeded with the current reading, so the estimate is usable immediately and improves as data arrives. It is saved across
+restarts and shown by the diagnostic **Average house consumption** sensor. The **learning window** (default 3 days)
+sets how quickly it adapts.
 
 **Battery target by sunset** (default 90 %) and **Forecast trust** (default 80 %) tune how cautious it is. Turn on the
 **EV-first charging** switch, which also needs **Solar charging**. While the trusted forecast, less house consumption

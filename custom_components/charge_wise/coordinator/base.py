@@ -26,6 +26,7 @@ from custom_components.charge_wise.const import (
     CONF_FORECAST_TRUST_PERCENT,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
+    CONF_HOUSE_LOAD_WINDOW_DAYS,
     CONF_HOUSE_POWER_ENTITY,
     CONF_LOW_SOLAR_CONFIRMATION_S,
     CONF_MAXIMUM_CURRENT_A,
@@ -42,6 +43,7 @@ from custom_components.charge_wise.const import (
     DEFAULT_COOLDOWN_S,
     DEFAULT_CURRENT_DEADBAND_A,
     DEFAULT_FORECAST_TRUST_PERCENT,
+    DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
     DEFAULT_SOLAR_START_W,
@@ -60,16 +62,20 @@ from custom_components.charge_wise.utils.charging_controller import (
     ControlSettings,
 )
 from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstInputs, EvFirstResult, evaluate_ev_first
+from custom_components.charge_wise.utils.house_load import HouseLoadProfile
 from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 if TYPE_CHECKING:
     from custom_components.charge_wise.data import ChargeWiseConfigEntry
+
+_HOUSE_LOAD_SAVE_DELAY_S = 300
 
 _POWER_FACTORS: dict[str, float] = {
     UnitOfPower.MILLIWATT: 0.001,
@@ -107,6 +113,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self.ev_first_config = self._ev_first_config_from_options()
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
+        self.house_load = HouseLoadProfile(
+            float(self.options.get(CONF_HOUSE_LOAD_WINDOW_DAYS, DEFAULT_HOUSE_LOAD_WINDOW_DAYS)),
+        )
+        self._house_load_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.house_load")
         self._timer_unsub: Any = None
         self._state_unsub: Any = None
         self._evaluation_lock = asyncio.Lock()
@@ -180,6 +190,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         }
         if self.ev_first_config is not None:
             entity_ids.add("sun.sun")
+            self.house_load.restore(await self._house_load_store.async_load())
         self._state_unsub = async_track_state_change_event(
             self.hass,
             entity_ids,
@@ -193,6 +204,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self._state_unsub()
             self._state_unsub = None
         self._cancel_timer()
+        if self.ev_first_config is not None:
+            await self._house_load_store.async_save(self.house_load.as_dict())
 
     async def async_set_switch(self, key: SwitchKey, value: bool, *, restoring: bool = False) -> None:
         """Turn a charging source on or off; a restored source waits through the safety cooldown."""
@@ -242,6 +255,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Calculate, apply, and publish one controller decision at a time."""
         now = dt_util.utcnow()
         local_now = dt_util.as_local(now)
+        self._observe_house_load(now)
         offpeak_active = self.switches["offpeak_enabled"] and is_active(self.windows, local_now)
         settings = ControlSettings(
             enabled=self.switches["enabled"],
@@ -306,7 +320,15 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             manual_current_a=self.manual_current_a,
             offpeak_current_a=self.offpeak_current_a,
             battery_protection_active=decision.battery_protection_active,
+            average_house_load_w=self.house_load.overall_w,
         )
+
+    def _observe_house_load(self, now: datetime) -> None:
+        """Feed the current house power into the learned consumption profile."""
+        if self.ev_first_config is None:
+            return
+        self.house_load.observe(self._power_w(self.options.get(CONF_HOUSE_POWER_ENTITY)), dt_util.as_local(now))
+        self._house_load_store.async_delay_save(self.house_load.as_dict, _HOUSE_LOAD_SAVE_DELAY_S)
 
     def _read_inputs(self, *, ev_first_active: bool = False) -> ControllerInput:
         """Read and normalize the currently configured Home Assistant entities."""
@@ -368,16 +390,24 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             return None
         sun_state = self.hass.states.get("sun.sun")
         hours_until_sunset: float | None = None
+        house_use_kwh: float | None = None
+        instant_w = self._power_w(self.options.get(CONF_HOUSE_POWER_ENTITY))
         if sun_state is not None and sun_state.state == "above_horizon":
             setting = dt_util.parse_datetime(str(sun_state.attributes.get("next_setting", "")))
             if setting is not None:
                 hours_until_sunset = (setting - now).total_seconds() / 3600
+                if instant_w is not None or self.house_load.overall_w is not None:
+                    house_use_kwh = self.house_load.expected_energy_kwh(
+                        dt_util.as_local(now),
+                        dt_util.as_local(setting),
+                        instant_w if instant_w is not None else 0.0,
+                    )
         return evaluate_ev_first(
             self.ev_first_config,
             EvFirstInputs(
                 forecast_remaining_kwh=self._energy_kwh(self.options.get(CONF_FORECAST_REMAINING_ENTITY)),
                 battery_level_percent=self._number_value(self.options.get(CONF_BATTERY_LEVEL_ENTITY)),
-                house_power_w=self._power_w(self.options.get(CONF_HOUSE_POWER_ENTITY)),
+                house_use_kwh=house_use_kwh,
                 hours_until_sunset=hours_until_sunset,
             ),
         )

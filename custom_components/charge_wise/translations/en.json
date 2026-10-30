@@ -73,19 +73,21 @@
         "data": {
           "forecast_remaining_entity": "Solar forecast remaining today",
           "battery_level_entity": "Battery level",
-          "house_power_entity": "Average house consumption",
+          "house_power_entity": "House power",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
           "forecast_trust_percent": "Forecast trust (%)",
+          "house_load_window_days": "House consumption learning window (days)",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
           "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
           "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
-          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
+          "house_power_entity": "Optional sensor (mW, W or kW) with the current house consumption, excluding the EV charger. Charge Wise learns the average per hour of day from it.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
           "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious.",
+          "house_load_window_days": "How many days of history the learned consumption averages follow. Shorter adapts faster.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
@@ -210,19 +212,21 @@
         "data": {
           "forecast_remaining_entity": "Solar forecast remaining today",
           "battery_level_entity": "Battery level",
-          "house_power_entity": "Average house consumption",
+          "house_power_entity": "House power",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
           "forecast_trust_percent": "Forecast trust (%)",
+          "house_load_window_days": "House consumption learning window (days)",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
           "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
           "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
-          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
+          "house_power_entity": "Optional sensor (mW, W or kW) with the current house consumption, excluding the EV charger. Charge Wise learns the average per hour of day from it.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
           "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious.",
+          "house_load_window_days": "How many days of history the learned consumption averages follow. Shorter adapts faster.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
@@ -335,6 +339,9 @@
       },
       "next_offpeak_window": {
         "name": "Next off-peak window"
+      },
+      "average_house_load": {
+        "name": "Average house consumption"
       }
     },
     "binary_sensor": {

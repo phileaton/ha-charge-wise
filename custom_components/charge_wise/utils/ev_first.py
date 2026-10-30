@@ -18,7 +18,7 @@ class EvFirstInputs:
 
     forecast_remaining_kwh: float | None
     battery_level_percent: float | None
-    house_power_w: float | None
+    house_use_kwh: float | None
     hours_until_sunset: float | None
 
 
@@ -40,7 +40,7 @@ def evaluate_ev_first(config: EvFirstConfig, inputs: EvFirstInputs) -> EvFirstRe
     if (
         inputs.forecast_remaining_kwh is None
         or inputs.battery_level_percent is None
-        or inputs.house_power_w is None
+        or inputs.house_use_kwh is None
         or inputs.hours_until_sunset is None
         or inputs.hours_until_sunset <= 0
     ):
@@ -49,5 +49,5 @@ def evaluate_ev_first(config: EvFirstConfig, inputs: EvFirstInputs) -> EvFirstRe
     missing_percent = max(0.0, config.battery_target_percent - inputs.battery_level_percent)
     battery_need_kwh = missing_percent / 100 * config.battery_capacity_kwh
     trusted_forecast_kwh = max(0.0, inputs.forecast_remaining_kwh) * config.forecast_trust_percent / 100
-    house_use_kwh = max(0.0, inputs.house_power_w) * inputs.hours_until_sunset / 1000
+    house_use_kwh = max(0.0, inputs.house_use_kwh)
     return EvFirstResult(battery_need_kwh, trusted_forecast_kwh - house_use_kwh)

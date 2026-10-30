@@ -23,6 +23,9 @@
       },
       "next_offpeak_window": {
         "default": "mdi:calendar-clock"
+      },
+      "average_house_load": {
+        "default": "mdi:home-lightning-bolt"
       }
     },
     "binary_sensor": {

@@ -23,6 +23,16 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         value_fn=lambda data: data.available_solar_w,
     ),
     ChargeWiseSensorEntityDescription(
+        key="average_house_load",
+        translation_key="average_house_load",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.average_house_load_w,
+    ),
+    ChargeWiseSensorEntityDescription(
         key="requested_current",
         translation_key="requested_current",
         device_class=SensorDeviceClass.CURRENT,

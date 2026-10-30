@@ -9,7 +9,7 @@ def _inputs(**overrides: float | None) -> EvFirstInputs:
     values: dict[str, float | None] = {
         "forecast_remaining_kwh": 30,
         "battery_level_percent": 50,
-        "house_power_w": 500,
+        "house_use_kwh": 3,
         "hours_until_sunset": 6,
     }
     values.update(overrides)
@@ -45,6 +45,6 @@ def test_battery_above_target_needs_nothing() -> None:
 
 def test_missing_input_or_set_sun_returns_none() -> None:
     """Any unavailable input, or no daylight left, disables EV-first."""
-    for field in ("forecast_remaining_kwh", "battery_level_percent", "house_power_w", "hours_until_sunset"):
+    for field in ("forecast_remaining_kwh", "battery_level_percent", "house_use_kwh", "hours_until_sunset"):
         assert evaluate_ev_first(CONFIG, _inputs(**{field: None})) is None
     assert evaluate_ev_first(CONFIG, _inputs(hours_until_sunset=0)) is None

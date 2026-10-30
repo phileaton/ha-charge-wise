@@ -28,6 +28,7 @@ from custom_components.charge_wise.const import (
     CONF_FORECAST_TRUST_PERCENT,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
+    CONF_HOUSE_LOAD_WINDOW_DAYS,
     CONF_HOUSE_POWER_ENTITY,
     CONF_LOW_SOLAR_CONFIRMATION_S,
     CONF_MAXIMUM_CURRENT_A,
@@ -43,6 +44,7 @@ from custom_components.charge_wise.const import (
     DEFAULT_COOLDOWN_S,
     DEFAULT_CURRENT_DEADBAND_A,
     DEFAULT_FORECAST_TRUST_PERCENT,
+    DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
     DEFAULT_SOLAR_START_W,
@@ -141,6 +143,16 @@ def forecast_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     }
     _add_number_field(schema, defaults, CONF_BATTERY_TARGET_PERCENT, DEFAULT_BATTERY_TARGET_PERCENT, 1, 100, 1, "%")
     _add_number_field(schema, defaults, CONF_FORECAST_TRUST_PERCENT, DEFAULT_FORECAST_TRUST_PERCENT, 1, 100, 1, "%")
+    _add_number_field(
+        schema,
+        defaults,
+        CONF_HOUSE_LOAD_WINDOW_DAYS,
+        DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
+        1,
+        30,
+        1,
+        "days",
+    )
     return probatio.Schema(schema)
 
 
