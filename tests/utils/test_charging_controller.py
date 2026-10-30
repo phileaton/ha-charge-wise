@@ -28,6 +28,7 @@ def _readings(
     charger_enabled: bool = False,
     current_target_a: float | None = 6,
     hardware_maximum_a: float | None = 32,
+    ev_first_boost_w: float = 0.0,
 ) -> ControllerInput:
     """Build a normal controller input with selected safety sensors."""
     return ControllerInput(
@@ -40,6 +41,7 @@ def _readings(
         charger_enabled=charger_enabled,
         current_target_a=current_target_a,
         hardware_maximum_a=hardware_maximum_a,
+        ev_first_boost_w=ev_first_boost_w,
     )
 
 
@@ -322,3 +324,20 @@ def test_no_source_enabled_does_not_charge() -> None:
 
     assert decision.status is ControllerStatus.OFF
     assert decision.reason is ChargeWiseReason.NO_SOURCE
+
+
+def test_ev_first_boost_adds_battery_charge_power_to_the_solar_budget() -> None:
+    """With the boost the EV may use power that would otherwise charge the battery."""
+    controller = ChargeWiseController(ControllerConfig())
+    plain = controller.evaluate(SOLAR, _readings(grid_power_w=-1800), START)
+    boosted = ChargeWiseController(ControllerConfig()).evaluate(
+        SOLAR,
+        _readings(grid_power_w=-1800, ev_first_boost_w=2400),
+        START,
+    )
+
+    assert plain.requested_current_a == 7
+    assert plain.reason is ChargeWiseReason.SOLAR_CHARGING
+    assert boosted.requested_current_a == 17
+    assert boosted.reason is ChargeWiseReason.EV_FIRST
+    assert boosted.available_solar_w == 4200

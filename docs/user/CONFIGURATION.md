@@ -46,6 +46,22 @@ every day, weekdays or weekends. Leave start and end empty to skip a window. A w
 23:00 to 06:00, and its days refer to the day it starts. Start and end must differ. Seasons, holidays and rate
 imports are not supported.
 
+## EV-first charging
+
+Optionally let the EV use power that would otherwise charge the home battery, when the solar forecast says the battery
+will still reach its target by sunset. Set all four of these in the setup or options form, or none:
+
+- **Solar forecast remaining today**: an energy sensor in Wh, kWh or MWh, such as Forecast.Solar.
+- **Battery level**: a percent sensor.
+- **Average house consumption**: a power sensor, excluding the charger.
+- **Battery capacity (kWh)**.
+
+**Battery target by sunset** (default 90 %) and **Forecast trust** (default 80 %) tune how cautious it is. Turn on the
+**EV-first charging** switch, which also needs **Solar charging**. While the trusted forecast, less house consumption
+until sunset, covers the battery's remaining need, the Solar budget also includes the power flowing into the battery
+(the **EV-first active** binary sensor shows this and the decision reason becomes EV first). Otherwise, or when an
+input or `sun.sun` is unavailable, Solar charging uses export only. The EV never draws from the battery itself.
+
 ## Controller options
 
 | Option                          |  Default | Description                                                                    |
@@ -81,12 +97,12 @@ protection binary sensor is created only when a battery-power entity is configur
 
 Each entry creates:
 
-- **Charging enabled**, **Solar charging**, **Off-peak charging** and **Manual override** switches.
+- **Charging enabled**, **Solar charging**, **Off-peak charging**, **Manual override** and **EV-first charging** switches.
 - **Manual current** and **Off-peak current** numbers.
 - **Controller status** sensor with the stable states Off, Waiting, Charging, Paused, and Error.
 - **Available solar budget**, **Requested current**, and **Decision reason** sensors.
 - **Next off-peak window** timestamp sensor.
-- **Off-peak active** binary sensor.
+- **Off-peak active** and **EV-first active** binary sensors.
 - **Battery protection active** binary sensor when battery power is configured.
 
 Entity IDs are based on the charger name chosen during setup. Use the entity picker in automations and dashboards

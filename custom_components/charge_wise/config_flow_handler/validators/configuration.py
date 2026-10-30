@@ -4,20 +4,24 @@ from typing import Any
 
 from custom_components.charge_wise.config_flow_handler.schemas.windows import validate_windows
 from custom_components.charge_wise.const import (
+    CONF_BATTERY_CAPACITY_KWH,
     CONF_BATTERY_DISCHARGE_W,
+    CONF_BATTERY_LEVEL_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
     CONF_BATTERY_RECOVERY_W,
     CONF_CHARGER_POWER_ENTITY,
     CONF_CHARGER_SWITCH_ENTITY,
     CONF_CURRENT_TARGET_ENTITY,
     CONF_EV_CONNECTED_ENTITY,
+    CONF_FORECAST_REMAINING_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
+    CONF_HOUSE_POWER_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
     DOMAIN,
 )
-from homeassistant.const import UnitOfPower
+from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
 
 _REQUIRED_ENTITY_DOMAINS = {
@@ -30,11 +34,26 @@ _OPTIONAL_ENTITY_DOMAINS = {
     CONF_HARDWARE_MAXIMUM_ENTITY: "number",
     CONF_BATTERY_POWER_ENTITY: "sensor",
     CONF_EV_CONNECTED_ENTITY: "binary_sensor",
+    CONF_FORECAST_REMAINING_ENTITY: "sensor",
+    CONF_BATTERY_LEVEL_ENTITY: "sensor",
+    CONF_HOUSE_POWER_ENTITY: "sensor",
 }
+_EV_FIRST_KEYS = (
+    CONF_FORECAST_REMAINING_ENTITY,
+    CONF_BATTERY_LEVEL_ENTITY,
+    CONF_HOUSE_POWER_ENTITY,
+    CONF_BATTERY_CAPACITY_KWH,
+)
 _POWER_SENSOR_KEYS = {
     CONF_GRID_POWER_ENTITY,
     CONF_CHARGER_POWER_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
+    CONF_HOUSE_POWER_ENTITY,
+}
+_ENERGY_UNITS = {
+    UnitOfEnergy.WATT_HOUR,
+    UnitOfEnergy.KILO_WATT_HOUR,
+    UnitOfEnergy.MEGA_WATT_HOUR,
 }
 _POWER_UNITS = {
     UnitOfPower.MILLIWATT,
@@ -75,6 +94,15 @@ def validate_configuration(
         state = hass.states.get(entity_id)
         if state is not None and state.attributes.get("unit_of_measurement") not in _POWER_UNITS:
             return {"base": "invalid_power_unit"}
+
+    forecast_entity = user_input.get(CONF_FORECAST_REMAINING_ENTITY)
+    if forecast_entity:
+        forecast_state = hass.states.get(forecast_entity)
+        if forecast_state is not None and forecast_state.attributes.get("unit_of_measurement") not in _ENERGY_UNITS:
+            return {"base": "invalid_energy_unit"}
+
+    if any(user_input.get(key) for key in _EV_FIRST_KEYS) and not all(user_input.get(key) for key in _EV_FIRST_KEYS):
+        return {"base": "ev_first_incomplete"}
 
     if user_input.get(CONF_HARDWARE_MAXIMUM_ENTITY) == user_input[CONF_CURRENT_TARGET_ENTITY]:
         return {"base": "invalid_entity"}

@@ -31,6 +31,9 @@
       },
       "offpeak_active": {
         "default": "mdi:clock-check-outline"
+      },
+      "ev_first_active": {
+        "default": "mdi:car-electric"
       }
     },
     "switch": {
@@ -51,6 +54,9 @@
       },
       "manual_override": {
         "default": "mdi:hand-back-right"
+      },
+      "ev_first_enabled": {
+        "default": "mdi:car-electric-outline"
       }
     }
   }

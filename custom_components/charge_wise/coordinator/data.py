@@ -23,6 +23,8 @@ class ChargeWiseSnapshot:
     solar_enabled: bool
     offpeak_enabled: bool
     manual_override: bool
+    ev_first_enabled: bool
+    ev_first_active: bool
     offpeak_active: bool
     next_offpeak_start: datetime | None
     status: ControllerStatus

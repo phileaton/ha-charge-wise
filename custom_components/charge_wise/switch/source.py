@@ -29,6 +29,11 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSwitchEntityDescription, ...] = (
         translation_key="manual_override",
         switch_key="manual_override",
     ),
+    ChargeWiseSwitchEntityDescription(
+        key="ev_first_enabled",
+        translation_key="ev_first_enabled",
+        switch_key="ev_first_enabled",
+    ),
 )
 
 

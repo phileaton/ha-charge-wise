@@ -37,6 +37,7 @@ class ChargeWiseReason(StrEnum):
     LOW_SOLAR_CONFIRMING = "low_solar_confirming"
     LOW_SOLAR = "low_solar"
     SOLAR_CHARGING = "solar_charging"
+    EV_FIRST = "ev_first"
     HARDWARE_LIMIT = "hardware_limit"
     CONTROL_FAILED = "control_failed"
 
@@ -85,6 +86,7 @@ class ControllerInput:
     charger_enabled: bool
     current_target_a: float | None
     hardware_maximum_a: float | None
+    ev_first_boost_w: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -190,7 +192,10 @@ class ChargeWiseController:
             return None
         if not self._solar_running:
             self._solar_running = True
-        return self._evaluate_solar(readings, now)
+        decision = self._evaluate_solar(readings, now)
+        if readings.ev_first_boost_w > 0 and decision.reason is ChargeWiseReason.SOLAR_CHARGING:
+            return replace(decision, reason=ChargeWiseReason.EV_FIRST)
+        return decision
 
     def _evaluate_offpeak(
         self,
@@ -231,7 +236,7 @@ class ChargeWiseController:
         if readings.battery_configured and readings.battery_discharge_w is None:
             return self._pause(ChargeWiseReason.BATTERY_UNAVAILABLE, readings, now)
 
-        available_solar_w = max(0.0, readings.charger_power_w - readings.grid_power_w)
+        available_solar_w = max(0.0, readings.charger_power_w - readings.grid_power_w + readings.ev_first_boost_w)
         next_updates = self._update_battery_protection(readings, now)
         low_solar_decision = self._evaluate_low_solar(readings, available_solar_w, now, next_updates)
         if low_solar_decision is not None:

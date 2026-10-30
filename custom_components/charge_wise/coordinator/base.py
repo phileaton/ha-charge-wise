@@ -7,20 +7,26 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from custom_components.charge_wise.const import (
     BATTERY_SIGN_NEGATIVE,
+    CONF_BATTERY_CAPACITY_KWH,
     CONF_BATTERY_CONFIRMATION_S,
     CONF_BATTERY_DISCHARGE_SIGN,
     CONF_BATTERY_DISCHARGE_W,
+    CONF_BATTERY_LEVEL_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
     CONF_BATTERY_RECOVERY_CONFIRMATION_S,
     CONF_BATTERY_RECOVERY_W,
+    CONF_BATTERY_TARGET_PERCENT,
     CONF_CHARGER_POWER_ENTITY,
     CONF_CHARGER_SWITCH_ENTITY,
     CONF_COOLDOWN_S,
     CONF_CURRENT_DEADBAND_A,
     CONF_CURRENT_TARGET_ENTITY,
     CONF_EV_CONNECTED_ENTITY,
+    CONF_FORECAST_REMAINING_ENTITY,
+    CONF_FORECAST_TRUST_PERCENT,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
+    CONF_HOUSE_POWER_ENTITY,
     CONF_LOW_SOLAR_CONFIRMATION_S,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
@@ -32,8 +38,10 @@ from custom_components.charge_wise.const import (
     DEFAULT_BATTERY_DISCHARGE_W,
     DEFAULT_BATTERY_RECOVERY_CONFIRMATION_S,
     DEFAULT_BATTERY_RECOVERY_W,
+    DEFAULT_BATTERY_TARGET_PERCENT,
     DEFAULT_COOLDOWN_S,
     DEFAULT_CURRENT_DEADBAND_A,
+    DEFAULT_FORECAST_TRUST_PERCENT,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
     DEFAULT_SOLAR_START_W,
@@ -51,10 +59,11 @@ from custom_components.charge_wise.utils.charging_controller import (
     ControllerStatus,
     ControlSettings,
 )
+from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstInputs, EvFirstResult, evaluate_ev_first
 from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
-from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfPower
+from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -69,7 +78,13 @@ _POWER_FACTORS: dict[str, float] = {
 }
 
 
-type SwitchKey = Literal["enabled", "solar_enabled", "offpeak_enabled", "manual_override"]
+_ENERGY_FACTORS_KWH: dict[str, float] = {
+    UnitOfEnergy.WATT_HOUR: 0.001,
+    UnitOfEnergy.KILO_WATT_HOUR: 1.0,
+    UnitOfEnergy.MEGA_WATT_HOUR: 1000.0,
+}
+
+type SwitchKey = Literal["enabled", "solar_enabled", "offpeak_enabled", "manual_override", "ev_first_enabled"]
 
 
 class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot]):
@@ -84,10 +99,12 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             "solar_enabled": False,
             "offpeak_enabled": False,
             "manual_override": False,
+            "ev_first_enabled": False,
         }
         self.manual_current_a = float(self.options[CONF_MINIMUM_CURRENT_A])
         self.offpeak_current_a = self.manual_current_a
         self.windows = windows_from_options(self.options.get(CONF_OFFPEAK_WINDOWS))
+        self.ev_first_config = self._ev_first_config_from_options()
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
         self._timer_unsub: Any = None
@@ -130,6 +147,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             solar_enabled=False,
             offpeak_enabled=False,
             manual_override=False,
+            ev_first_enabled=False,
+            ev_first_active=False,
             offpeak_active=False,
             next_offpeak_start=None,
             status=ControllerStatus.OFF,
@@ -153,9 +172,14 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 CONF_HARDWARE_MAXIMUM_ENTITY,
                 CONF_BATTERY_POWER_ENTITY,
                 CONF_EV_CONNECTED_ENTITY,
+                CONF_FORECAST_REMAINING_ENTITY,
+                CONF_BATTERY_LEVEL_ENTITY,
+                CONF_HOUSE_POWER_ENTITY,
             )
             if self.options.get(key)
         }
+        if self.ev_first_config is not None:
+            entity_ids.add("sun.sun")
         self._state_unsub = async_track_state_change_event(
             self.hass,
             entity_ids,
@@ -172,6 +196,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
 
     async def async_set_switch(self, key: SwitchKey, value: bool, *, restoring: bool = False) -> None:
         """Turn a charging source on or off; a restored source waits through the safety cooldown."""
+        if key == "ev_first_enabled" and value and self.ev_first_config is None:
+            if restoring:
+                return
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="ev_first_not_configured")
         self.switches[key] = value
         if restoring and value:
             self.controller.start_cooldown(dt_util.utcnow())
@@ -225,7 +253,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             offpeak_active=offpeak_active,
             offpeak_next_change=next_change(self.windows, local_now),
         )
-        decision = self.controller.evaluate(settings, self._read_inputs(), now)
+        ev_first_active = self._ev_first_active(now)
+        decision = self.controller.evaluate(settings, self._read_inputs(ev_first_active=ev_first_active), now)
         next_start_at = next_start(self.windows, local_now) if self.switches["offpeak_enabled"] else None
         try:
             await self._async_apply_decision(decision)
@@ -237,6 +266,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                     decision,
                     offpeak_active,
                     next_start_at,
+                    ev_first_active,
                     status=ControllerStatus.ERROR,
                     reason=ChargeWiseReason.CONTROL_FAILED,
                     requested_current_a=0.0,
@@ -245,7 +275,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self._cancel_timer()
             return
 
-        self.async_set_updated_data(self._snapshot(decision, offpeak_active, next_start_at))
+        self.async_set_updated_data(self._snapshot(decision, offpeak_active, next_start_at, ev_first_active))
         self._schedule_timer(decision)
 
     def _snapshot(
@@ -253,6 +283,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         decision: ControllerDecision,
         offpeak_active: bool,
         next_offpeak_start: datetime | None,
+        ev_first_active: bool,
         *,
         status: ControllerStatus | None = None,
         reason: ChargeWiseReason | None = None,
@@ -264,6 +295,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             solar_enabled=self.switches["solar_enabled"],
             offpeak_enabled=self.switches["offpeak_enabled"],
             manual_override=self.switches["manual_override"],
+            ev_first_enabled=self.switches["ev_first_enabled"],
+            ev_first_active=ev_first_active,
             offpeak_active=offpeak_active,
             next_offpeak_start=next_offpeak_start,
             status=status or decision.status,
@@ -275,7 +308,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             battery_protection_active=decision.battery_protection_active,
         )
 
-    def _read_inputs(self) -> ControllerInput:
+    def _read_inputs(self, *, ev_first_active: bool = False) -> ControllerInput:
         """Read and normalize the currently configured Home Assistant entities."""
         battery_power = self._power_w(self.options.get(CONF_BATTERY_POWER_ENTITY))
         if (
@@ -298,6 +331,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 elif state.state == STATE_OFF:
                     ev_connected = False
 
+        ev_first_boost_w = max(0.0, -battery_power) if ev_first_active and battery_power is not None else 0.0
+
         return ControllerInput(
             grid_power_w=self._power_w(self.options[CONF_GRID_POWER_ENTITY]),
             charger_power_w=self._power_w(self.options[CONF_CHARGER_POWER_ENTITY]),
@@ -308,7 +343,67 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             charger_enabled=self._entity_is_on(self.options[CONF_CHARGER_SWITCH_ENTITY]),
             current_target_a=self._number_value(self.options[CONF_CURRENT_TARGET_ENTITY]),
             hardware_maximum_a=self._number_value(self.options.get(CONF_HARDWARE_MAXIMUM_ENTITY)),
+            ev_first_boost_w=ev_first_boost_w,
         )
+
+    def _ev_first_config_from_options(self) -> EvFirstConfig | None:
+        """Return the EV-first settings, or None when the forecast inputs are not all configured."""
+        keys = (
+            CONF_FORECAST_REMAINING_ENTITY,
+            CONF_BATTERY_LEVEL_ENTITY,
+            CONF_HOUSE_POWER_ENTITY,
+            CONF_BATTERY_CAPACITY_KWH,
+        )
+        if not all(self.options.get(key) for key in keys):
+            return None
+        return EvFirstConfig(
+            battery_capacity_kwh=float(self.options[CONF_BATTERY_CAPACITY_KWH]),
+            battery_target_percent=float(self.options.get(CONF_BATTERY_TARGET_PERCENT, DEFAULT_BATTERY_TARGET_PERCENT)),
+            forecast_trust_percent=float(self.options.get(CONF_FORECAST_TRUST_PERCENT, DEFAULT_FORECAST_TRUST_PERCENT)),
+        )
+
+    def _ev_first_result(self, now: datetime) -> EvFirstResult | None:
+        """Return the forecast energy balance, or None when EV-first cannot be judged."""
+        if self.ev_first_config is None:
+            return None
+        sun_state = self.hass.states.get("sun.sun")
+        hours_until_sunset: float | None = None
+        if sun_state is not None and sun_state.state == "above_horizon":
+            setting = dt_util.parse_datetime(str(sun_state.attributes.get("next_setting", "")))
+            if setting is not None:
+                hours_until_sunset = (setting - now).total_seconds() / 3600
+        return evaluate_ev_first(
+            self.ev_first_config,
+            EvFirstInputs(
+                forecast_remaining_kwh=self._energy_kwh(self.options.get(CONF_FORECAST_REMAINING_ENTITY)),
+                battery_level_percent=self._number_value(self.options.get(CONF_BATTERY_LEVEL_ENTITY)),
+                house_power_w=self._power_w(self.options.get(CONF_HOUSE_POWER_ENTITY)),
+                hours_until_sunset=hours_until_sunset,
+            ),
+        )
+
+    def _ev_first_active(self, now: datetime) -> bool:
+        """Return whether the EV may currently share the battery's charging power."""
+        if not (self.switches["ev_first_enabled"] and self.switches["solar_enabled"]):
+            return False
+        result = self._ev_first_result(now)
+        return result is not None and result.active
+
+    def _energy_kwh(self, entity_id: str | None) -> float | None:
+        """Return a finite energy reading converted to kWh."""
+        if entity_id is None:
+            return None
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return None
+        try:
+            value = float(state.state)
+        except ValueError:
+            return None
+        factor = _ENERGY_FACTORS_KWH.get(str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)))
+        if factor is None or not isfinite(value):
+            return None
+        return value * factor
 
     def _power_w(self, entity_id: str | None) -> float | None:
         """Return a finite W measurement from a sensor reporting a power unit."""

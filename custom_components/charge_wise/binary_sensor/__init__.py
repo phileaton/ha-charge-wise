@@ -6,6 +6,10 @@ from custom_components.charge_wise.binary_sensor.battery_protection import (
     ENTITY_DESCRIPTION,
     ChargeWiseBatteryProtectionBinarySensor,
 )
+from custom_components.charge_wise.binary_sensor.ev_first_active import (
+    ENTITY_DESCRIPTION as EV_FIRST_DESCRIPTION,
+    ChargeWiseEvFirstActiveBinarySensor,
+)
 from custom_components.charge_wise.binary_sensor.offpeak_active import (
     ENTITY_DESCRIPTION as OFFPEAK_DESCRIPTION,
     ChargeWiseOffpeakActiveBinarySensor,
@@ -28,7 +32,12 @@ async def async_setup_entry(
 ) -> None:
     """Create the battery-protection entity when its source is configured."""
     coordinator = entry.runtime_data.coordinator
-    async_add_entities([ChargeWiseOffpeakActiveBinarySensor(coordinator, OFFPEAK_DESCRIPTION)])
+    async_add_entities(
+        [
+            ChargeWiseOffpeakActiveBinarySensor(coordinator, OFFPEAK_DESCRIPTION),
+            ChargeWiseEvFirstActiveBinarySensor(coordinator, EV_FIRST_DESCRIPTION),
+        ],
+    )
     if coordinator.battery_configured:
         async_add_entities(
             [ChargeWiseBatteryProtectionBinarySensor(coordinator, ENTITY_DESCRIPTION)],

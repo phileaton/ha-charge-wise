@@ -32,7 +32,13 @@
           "offpeak_window_2_days": "Off-peak window 2 days",
           "offpeak_window_3_start": "Off-peak window 3 start",
           "offpeak_window_3_end": "Off-peak window 3 end",
-          "offpeak_window_3_days": "Off-peak window 3 days"
+          "offpeak_window_3_days": "Off-peak window 3 days",
+          "forecast_remaining_entity": "Solar forecast remaining today",
+          "battery_level_entity": "Battery level",
+          "house_power_entity": "Average house consumption",
+          "battery_capacity_kwh": "Battery capacity (kWh)",
+          "battery_target_percent": "Battery target by sunset (%)",
+          "forecast_trust_percent": "Forecast trust (%)"
         },
         "data_description": {
           "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
@@ -62,7 +68,13 @@
           "offpeak_window_2_days": "Optional.",
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
-          "offpeak_window_3_days": "Optional."
+          "offpeak_window_3_days": "Optional.",
+          "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
+          "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
+          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
+          "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
+          "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
+          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
         }
       }
     },
@@ -76,7 +88,9 @@
       "invalid_limits": "The maximum current must be at least the minimum operating current.",
       "invalid_power_unit": "Power sensors must report mW, W, or kW.",
       "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
-      "offpeak_window_empty": "An off-peak window cannot start and end at the same time."
+      "offpeak_window_empty": "An off-peak window cannot start and end at the same time.",
+      "invalid_energy_unit": "The forecast sensor must report Wh, kWh, or MWh.",
+      "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty."
     },
     "abort": {
       "already_configured": "This charger is already configured."
@@ -115,7 +129,13 @@
           "offpeak_window_2_days": "Off-peak window 2 days",
           "offpeak_window_3_start": "Off-peak window 3 start",
           "offpeak_window_3_end": "Off-peak window 3 end",
-          "offpeak_window_3_days": "Off-peak window 3 days"
+          "offpeak_window_3_days": "Off-peak window 3 days",
+          "forecast_remaining_entity": "Solar forecast remaining today",
+          "battery_level_entity": "Battery level",
+          "house_power_entity": "Average house consumption",
+          "battery_capacity_kwh": "Battery capacity (kWh)",
+          "battery_target_percent": "Battery target by sunset (%)",
+          "forecast_trust_percent": "Forecast trust (%)"
         },
         "data_description": {
           "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
@@ -145,7 +165,13 @@
           "offpeak_window_2_days": "Optional.",
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
-          "offpeak_window_3_days": "Optional."
+          "offpeak_window_3_days": "Optional.",
+          "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
+          "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
+          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
+          "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
+          "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
+          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
         }
       }
     },
@@ -159,7 +185,9 @@
       "invalid_limits": "The maximum current must be at least the minimum operating current.",
       "invalid_power_unit": "Power sensors must report mW, W, or kW.",
       "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
-      "offpeak_window_empty": "An off-peak window cannot start and end at the same time."
+      "offpeak_window_empty": "An off-peak window cannot start and end at the same time.",
+      "invalid_energy_unit": "The forecast sensor must report Wh, kWh, or MWh.",
+      "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty."
     }
   },
   "exceptions": {
@@ -168,6 +196,9 @@
     },
     "legacy_entry": {
       "message": "This entry uses the removed demo configuration. Remove it and add Charge Wise again with your charger entities."
+    },
+    "ev_first_not_configured": {
+      "message": "EV-first charging needs the forecast, battery level, house consumption and battery capacity configured in the options."
     }
   },
   "entity": {
@@ -218,7 +249,8 @@
           "low_solar": "Charging stopped because solar power remained low",
           "solar_charging": "Charging from available solar power",
           "hardware_limit": "The hardware limit is below the minimum operating current",
-          "control_failed": "A charger command failed"
+          "control_failed": "A charger command failed",
+          "ev_first": "Charging from solar, sharing the battery's charging power"
         }
       },
       "next_offpeak_window": {
@@ -231,6 +263,9 @@
       },
       "offpeak_active": {
         "name": "Off-peak active"
+      },
+      "ev_first_active": {
+        "name": "EV-first active"
       }
     },
     "switch": {
@@ -245,6 +280,9 @@
       },
       "manual_override": {
         "name": "Manual override"
+      },
+      "ev_first_enabled": {
+        "name": "EV-first charging"
       }
     }
   },
