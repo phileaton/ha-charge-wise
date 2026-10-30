@@ -26,6 +26,7 @@ CONF_BATTERY_CONFIRMATION_S = "battery_confirmation_s"
 CONF_BATTERY_RECOVERY_CONFIRMATION_S = "battery_recovery_confirmation_s"
 CONF_CURRENT_DEADBAND_A = "current_deadband_a"
 CONF_MANUAL_CURRENT_A = "manual_current_a"
+CONF_OFFPEAK_WINDOWS = "offpeak_windows"
 
 BATTERY_SIGN_POSITIVE = "positive"
 BATTERY_SIGN_NEGATIVE = "negative"

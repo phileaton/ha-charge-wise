@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from custom_components.charge_wise.config_flow_handler.schemas.windows import validate_windows
 from custom_components.charge_wise.const import (
     CONF_BATTERY_DISCHARGE_W,
     CONF_BATTERY_POWER_ENTITY,
@@ -106,4 +107,4 @@ def validate_configuration(
         ):
             return {"base": "already_configured"}
 
-    return {}
+    return validate_windows(user_input)

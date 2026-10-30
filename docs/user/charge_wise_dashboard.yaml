@@ -6,8 +6,14 @@ views:
         title: Garage Charger
         show_header_toggle: false
         entities:
-          - entity: select.garage_charger_mode
+          - entity: switch.garage_charger_charging_enabled
+          - entity: switch.garage_charger_solar_charging
+          - entity: switch.garage_charger_off_peak_charging
+          - entity: switch.garage_charger_manual_override
           - entity: number.garage_charger_manual_current
+          - entity: number.garage_charger_off_peak_current
+          - entity: binary_sensor.garage_charger_off_peak_active
+          - entity: sensor.garage_charger_next_off_peak_window
           - entity: sensor.garage_charger_controller_status
           - entity: sensor.garage_charger_requested_current
           - entity: sensor.garage_charger_available_solar_budget

@@ -20,16 +20,31 @@ The safe maximum is required even if a hardware-maximum entity is selected. If t
 unavailable, the configured safe maximum still applies. Multiple Charge Wise entries may share measurement sensors,
 but cannot share a charger switch or active current target.
 
-## Operating modes
+## Charging sources
 
-- **Off** disables charging. New entries start in this mode.
-- **Manual** requests the value set by the **Manual current** number entity, bounded by the configured minimum,
-  maximum, and any available hardware ceiling.
-- **Solar** calculates available solar headroom as `max(0, measured charger power - net grid power)`. It converts that
-  budget to current using the configured single-phase voltage and never requests more than the configured limits.
+Four switches control what Charge Wise does. All start off on a new entry.
 
-The selected mode is restored after a Home Assistant restart. A restored mode is checked against current sensor values
-and held through the restart cooldown before Solar can start.
+- **Charging enabled** is the master switch. While it is off, nothing is charged.
+- **Solar charging** calculates available solar headroom as `max(0, measured charger power - net grid power)`. It
+  converts that budget to current using the configured single-phase voltage and never requests more than the
+  configured limits.
+- **Off-peak charging** charges from the grid at the **Off-peak current** while an off-peak window is active. It
+  ignores the solar budget and battery protection, but still respects the EV-connected sensor, the current maximum
+  and the failure stop.
+- **Manual override** requests only the **Manual current** and ignores the Solar and off-peak sources.
+
+Solar and off-peak can be on together. Inside a window the higher of the two requested currents wins, and Solar wins a
+tie. Outside a window Solar runs as usual.
+
+The switch states are restored after a Home Assistant restart. A restored Solar source is checked against current
+sensor values and held through the restart cooldown before it can start.
+
+## Off-peak windows
+
+Set up to three windows in the setup or options form. Each has a start time, an end time and the days it applies to:
+every day, weekdays or weekends. Leave start and end empty to skip a window. A window may cross midnight, for example
+23:00 to 06:00, and its days refer to the day it starts. Start and end must differ. Seasons, holidays and rate
+imports are not supported.
 
 ## Controller options
 
@@ -40,7 +55,7 @@ and held through the restart cooldown before Solar can start.
 | Charging voltage                |    240 V | Single-phase voltage for power-to-current conversion                           |
 | Solar start threshold           |  1,800 W | Available solar headroom required to start charging                            |
 | Low-solar confirmation          |     90 s | How long headroom may remain below minimum before charging stops               |
-| Restart cooldown                |    3 min | Minimum wait after stopping or restoring a mode before Solar can restart       |
+| Restart cooldown                |    3 min | Minimum wait after stopping or restoring Solar before it can restart           |
 | Battery discharge threshold     |    300 W | Discharge level that starts the protection confirmation timer                  |
 | Battery recovery threshold      |    150 W | Discharge must remain below this level before protection clears                |
 | Battery protection confirmation |     90 s | Time discharge must exceed its threshold before protection activates           |
@@ -53,24 +68,25 @@ protection binary sensor is created only when a battery-power entity is configur
 
 ## Safety and unavailable inputs
 
-- In Solar mode, invalid or unavailable grid or charger power stops charging. A configured battery sensor that becomes
+- For the Solar source, invalid or unavailable grid or charger power stops charging. A configured battery sensor that becomes
   invalid also stops Solar operation.
-- If an EV-connected sensor is configured, an unavailable or disconnected state holds charging in both Manual and
-  Solar modes.
+- If an EV-connected sensor is configured, an unavailable or disconnected state holds charging for every source.
 - If optional battery or EV-connected sensors are not configured, the integration cannot provide those protections.
 - There is no generic stale-reading timeout or handling of source-specific timestamp attributes. Charge Wise relies
   on each source integration to mark stale readings unavailable.
-- Sensor recovery does not change the selected mode. Solar only resumes after its safety checks and cooldown.
+- Sensor recovery does not change the switches. Solar only resumes after its safety checks and cooldown.
 - A failed target or switch command is reported as an error and triggers a best-effort stop command.
 
 ## Entities
 
 Each entry creates:
 
-- **Mode** select.
-- **Manual current** number.
+- **Charging enabled**, **Solar charging**, **Off-peak charging** and **Manual override** switches.
+- **Manual current** and **Off-peak current** numbers.
 - **Controller status** sensor with the stable states Off, Waiting, Charging, Paused, and Error.
 - **Available solar budget**, **Requested current**, and **Decision reason** sensors.
+- **Next off-peak window** timestamp sensor.
+- **Off-peak active** binary sensor.
 - **Battery protection active** binary sensor when battery power is configured.
 
 Entity IDs are based on the charger name chosen during setup. Use the entity picker in automations and dashboards

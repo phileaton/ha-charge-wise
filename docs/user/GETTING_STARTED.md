@@ -38,7 +38,7 @@ Install Charge Wise through HACS as a custom integration, or copy `custom_compon
 3. Select the grid-power sensor, charger-power sensor, charger switch, and writable current target.
 4. Enter a safe maximum current and review the operating limits and Solar defaults.
 5. Add the optional battery and EV-connected sensors if you want those protections.
-6. Submit the form. The new entry starts in **Off** mode.
+6. Submit the form. The new entry starts with all switches off.
 
 The setup form validates selected entity domains, available power units, safe current limits, and duplicate charger
 controls. Multiple entries may share measurement sensors, but not the same charger switch or active current target.
@@ -47,9 +47,9 @@ controls. Multiple entries may share measurement sensors, but not the same charg
 
 1. Confirm the selected current-target number controls the intended charger and is measured in amperes.
 2. Confirm import is positive and export is negative on the grid-power sensor.
-3. Keep the mode **Off** while checking the current and hardware limits.
-4. Use **Manual** to request a controlled current, or **Solar** to start only when the configured solar threshold is
-   met.
+3. Keep **Charging enabled** off while checking the current and hardware limits.
+4. Turn on **Charging enabled**, then use **Manual override** to request a controlled current, **Solar charging** to
+   start only when the configured solar threshold is met, or **Off-peak charging** to charge in your off-peak windows.
 
 See [Configuration](./CONFIGURATION.md) for all thresholds and controller behavior, and [Examples](./EXAMPLES.md) for
 automations and an importable dashboard.

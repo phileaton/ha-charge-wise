@@ -4,14 +4,17 @@ from datetime import UTC, datetime, timedelta
 
 from custom_components.charge_wise.utils.charging_controller import (
     ChargeWiseController,
-    ChargeWiseMode,
     ChargeWiseReason,
     ControllerConfig,
     ControllerInput,
     ControllerStatus,
+    ControlSettings,
 )
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
+OFF = ControlSettings()
+SOLAR = ControlSettings(enabled=True, solar_enabled=True)
+MANUAL = ControlSettings(enabled=True, manual_override=True, manual_current_a=20)
 
 
 def _readings(
@@ -40,11 +43,10 @@ def _readings(
     )
 
 
-def test_off_mode_never_requests_charging() -> None:
-    """Off mode returns a disabled decision."""
+def test_master_off_never_requests_charging() -> None:
+    """Master off returns a disabled decision."""
     decision = ChargeWiseController(ControllerConfig()).evaluate(
-        ChargeWiseMode.OFF,
-        10,
+        OFF,
         _readings(),
         START,
     )
@@ -59,14 +61,12 @@ def test_solar_mode_starts_only_after_the_start_threshold() -> None:
     """Solar mode waits below its start threshold and floors current to available power."""
     controller = ChargeWiseController(ControllerConfig())
     waiting = controller.evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         _readings(grid_power_w=-1799),
         START,
     )
     charging = controller.evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         _readings(grid_power_w=-1800),
         START,
     )
@@ -87,10 +87,9 @@ def test_battery_protection_is_confirmed_and_reduces_full_discharge() -> None:
         charger_enabled=True,
         current_target_a=12,
     )
-    confirming = controller.evaluate(ChargeWiseMode.SOLAR, 6, readings, START)
+    confirming = controller.evaluate(SOLAR, readings, START)
     protected = controller.evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         readings,
         START + timedelta(seconds=90),
     )
@@ -112,11 +111,10 @@ def test_battery_protection_stops_below_the_minimum_current() -> None:
         charger_enabled=True,
         current_target_a=8,
     )
-    controller.evaluate(ChargeWiseMode.SOLAR, 6, readings, START)
+    controller.evaluate(SOLAR, readings, START)
 
     decision = controller.evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         readings,
         START + timedelta(seconds=90),
     )
@@ -136,8 +134,8 @@ def test_battery_recovery_waits_for_confirmation_and_cooldown() -> None:
         charger_enabled=True,
         current_target_a=12,
     )
-    controller.evaluate(ChargeWiseMode.SOLAR, 6, high, START)
-    controller.evaluate(ChargeWiseMode.SOLAR, 6, high, START + timedelta(seconds=90))
+    controller.evaluate(SOLAR, high, START)
+    controller.evaluate(SOLAR, high, START + timedelta(seconds=90))
     low = _readings(
         grid_power_w=0,
         charger_power_w=3000,
@@ -147,14 +145,12 @@ def test_battery_recovery_waits_for_confirmation_and_cooldown() -> None:
     )
 
     recovering = controller.evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         low,
         START + timedelta(seconds=181),
     )
     recovered = controller.evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         low,
         START + timedelta(seconds=271),
     )
@@ -170,8 +166,7 @@ def test_battery_recovery_waits_for_confirmation_and_cooldown() -> None:
 def test_invalid_configured_battery_reading_pauses_solar() -> None:
     """A missing configured battery reading cannot silently disable protection."""
     decision = ChargeWiseController(ControllerConfig()).evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         _readings(battery_discharge_w=None),
         START,
     )
@@ -190,10 +185,9 @@ def test_low_solar_confirmation_stops_charging_after_ninety_seconds() -> None:
         charger_enabled=True,
         current_target_a=6,
     )
-    confirming = controller.evaluate(ChargeWiseMode.SOLAR, 6, readings, START)
+    confirming = controller.evaluate(SOLAR, readings, START)
     stopped = controller.evaluate(
-        ChargeWiseMode.SOLAR,
-        6,
+        SOLAR,
         readings,
         START + timedelta(seconds=90),
     )
@@ -205,11 +199,10 @@ def test_low_solar_confirmation_stops_charging_after_ninety_seconds() -> None:
     assert not stopped.charger_enabled
 
 
-def test_manual_mode_respects_hardware_ceiling() -> None:
+def test_manual_override_respects_hardware_ceiling() -> None:
     """Manual current is clamped by the configured and live hardware maxima."""
     decision = ChargeWiseController(ControllerConfig()).evaluate(
-        ChargeWiseMode.MANUAL,
-        20,
+        MANUAL,
         _readings(
             hardware_maximum_a=16,
             grid_power_w=None,
@@ -221,3 +214,111 @@ def test_manual_mode_respects_hardware_ceiling() -> None:
     assert decision.status is ControllerStatus.CHARGING
     assert decision.requested_current_a == 16
     assert decision.charger_enabled
+
+
+def _offpeak(**overrides: object) -> ControlSettings:
+    values: dict[str, object] = {
+        "enabled": True,
+        "offpeak_enabled": True,
+        "offpeak_active": True,
+        "offpeak_current_a": 10,
+        "offpeak_next_change": START + timedelta(hours=2),
+    }
+    values.update(overrides)
+    return ControlSettings(**values)  # type: ignore[arg-type]
+
+
+def test_offpeak_window_charges_from_the_grid_without_solar() -> None:
+    """An active window charges at the off-peak current even with no surplus."""
+    decision = ChargeWiseController(ControllerConfig()).evaluate(
+        _offpeak(),
+        _readings(grid_power_w=3000, charger_power_w=0),
+        START,
+    )
+
+    assert decision.status is ControllerStatus.CHARGING
+    assert decision.reason is ChargeWiseReason.OFFPEAK_WINDOW
+    assert decision.requested_current_a == 10
+    assert decision.next_update_at == START + timedelta(hours=2)
+
+
+def test_offpeak_outside_a_window_waits_and_schedules_the_next_boundary() -> None:
+    """Outside a window nothing charges and the next boundary is the re-evaluation time."""
+    decision = ChargeWiseController(ControllerConfig()).evaluate(
+        _offpeak(offpeak_active=False),
+        _readings(),
+        START,
+    )
+
+    assert decision.status is ControllerStatus.WAITING
+    assert decision.reason is ChargeWiseReason.OFFPEAK_WAITING
+    assert not decision.charger_enabled
+    assert decision.next_update_at == START + timedelta(hours=2)
+
+
+def test_highest_request_wins_when_solar_and_offpeak_are_on() -> None:
+    """Solar above the off-peak current wins; below it, off-peak wins."""
+    settings = _offpeak(solar_enabled=True, offpeak_current_a=10)
+    high_solar = ChargeWiseController(ControllerConfig()).evaluate(
+        settings,
+        _readings(grid_power_w=-6000),
+        START,
+    )
+    low_solar = ChargeWiseController(ControllerConfig()).evaluate(
+        settings,
+        _readings(grid_power_w=-2000),
+        START,
+    )
+
+    assert high_solar.reason is ChargeWiseReason.SOLAR_CHARGING
+    assert high_solar.requested_current_a == 25
+    assert low_solar.reason is ChargeWiseReason.OFFPEAK_WINDOW
+    assert low_solar.requested_current_a == 10
+    assert low_solar.available_solar_w == 2000
+
+
+def test_offpeak_ignores_missing_solar_sensors() -> None:
+    """Grid charging does not depend on the Solar inputs."""
+    decision = ChargeWiseController(ControllerConfig()).evaluate(
+        _offpeak(solar_enabled=True),
+        _readings(grid_power_w=None, charger_power_w=None),
+        START,
+    )
+
+    assert decision.reason is ChargeWiseReason.OFFPEAK_WINDOW
+    assert decision.charger_enabled
+
+
+def test_manual_override_beats_solar_and_offpeak() -> None:
+    """Manual override uses its own current and ignores the other sources."""
+    decision = ChargeWiseController(ControllerConfig()).evaluate(
+        _offpeak(solar_enabled=True, manual_override=True, manual_current_a=14),
+        _readings(grid_power_w=-6000),
+        START,
+    )
+
+    assert decision.reason is ChargeWiseReason.MANUAL
+    assert decision.requested_current_a == 14
+
+
+def test_offpeak_still_requires_a_connected_ev_and_respects_hardware_limit() -> None:
+    """EV safety and the charger ceiling apply to off-peak charging."""
+    controller = ChargeWiseController(ControllerConfig())
+    disconnected = controller.evaluate(_offpeak(), _readings(ev_connected=False), START)
+    limited = controller.evaluate(_offpeak(offpeak_current_a=30), _readings(hardware_maximum_a=16), START)
+
+    assert disconnected.reason is ChargeWiseReason.EV_DISCONNECTED
+    assert not disconnected.charger_enabled
+    assert limited.requested_current_a == 16
+
+
+def test_no_source_enabled_does_not_charge() -> None:
+    """Master on with every source off requests nothing."""
+    decision = ChargeWiseController(ControllerConfig()).evaluate(
+        ControlSettings(enabled=True),
+        _readings(),
+        START,
+    )
+
+    assert decision.status is ControllerStatus.OFF
+    assert decision.reason is ChargeWiseReason.NO_SOURCE

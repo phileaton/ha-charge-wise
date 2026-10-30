@@ -5,13 +5,13 @@ entities. It calculates charging decisions locally; it does not connect to a cha
 
 ## What it does
 
-- Offers Off, Manual, and Solar modes.
+- Charges from surplus solar, in configurable off-peak time windows, or both, with a manual override.
 - Adjusts the current target from signed grid power and measured charger power.
 - Applies configurable current limits, Solar hysteresis, cooldowns, and optional battery-discharge protection.
 - Can hold charging until an optional EV-connected sensor reports a connected vehicle.
 - Supports multiple independent charger entries.
 
-The integration starts in Off mode. Configure the entities and safe current limits before selecting Manual or Solar.
+The integration starts with every switch off. Configure the entities and safe current limits before turning on charging.
 If battery or EV-connected sensors are omitted, the corresponding protection is unavailable.
 
 ## Requirements

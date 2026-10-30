@@ -3,6 +3,7 @@
 from typing import Any
 
 from custom_components.charge_wise.config_flow_handler.schemas import get_configuration_schema
+from custom_components.charge_wise.config_flow_handler.schemas.windows import form_to_options, windows_to_form
 from custom_components.charge_wise.config_flow_handler.validators.configuration import validate_configuration
 from homeassistant import config_entries
 
@@ -23,11 +24,11 @@ class ChargeWiseOptionsFlow(config_entries.OptionsFlow):
                 current_entry_id=self.config_entry.entry_id,
             )
             if not errors:
-                return self.async_create_entry(title="", data=user_input)
+                return self.async_create_entry(title="", data=form_to_options(user_input))
 
         schema = self.add_suggested_values_to_schema(
             get_configuration_schema(self.config_entry.options),
-            self.config_entry.options,
+            {**self.config_entry.options, **windows_to_form(self.config_entry.options)},
         )
         return self.async_show_form(
             step_id="init",

@@ -5,6 +5,7 @@ from typing import Any
 
 import probatio
 
+from custom_components.charge_wise.config_flow_handler.schemas.windows import add_window_fields
 from custom_components.charge_wise.const import (
     BATTERY_SIGN_NEGATIVE,
     BATTERY_SIGN_POSITIVE,
@@ -152,6 +153,7 @@ def get_configuration_schema(defaults: Mapping[str, Any] | None = None) -> proba
         0.5,
         "A",
     )
+    add_window_fields(schema)
     return probatio.Schema(schema)
 
 

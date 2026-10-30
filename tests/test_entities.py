@@ -37,7 +37,13 @@ async def test_setup_exposes_the_charge_wise_control_surface(
     init_integration: MockConfigEntry,
 ) -> None:
     """The configured entry creates translated control and diagnostic entities."""
-    select_entity = _entity_id(hass, init_integration, "select", "mode")
+    switch_entities = [
+        _entity_id(hass, init_integration, "switch", key)
+        for key in ("enabled", "solar_enabled", "offpeak_enabled", "manual_override")
+    ]
+    offpeak_number = _entity_id(hass, init_integration, "number", "offpeak_current")
+    next_window = _entity_id(hass, init_integration, "sensor", "next_offpeak_window")
+    offpeak_active = _entity_id(hass, init_integration, "binary_sensor", "offpeak_active")
     number_entity = _entity_id(hass, init_integration, "number", "manual_current")
     status_entity = _entity_id(hass, init_integration, "sensor", "controller_status")
     solar_entity = _entity_id(hass, init_integration, "sensor", "available_solar_budget")
@@ -45,7 +51,10 @@ async def test_setup_exposes_the_charge_wise_control_surface(
     reason_entity = _entity_id(hass, init_integration, "sensor", "decision_reason")
     battery_entity = _entity_id(hass, init_integration, "binary_sensor", "battery_protection")
 
-    assert hass.states.get(select_entity).state == "off"
+    assert all(hass.states.get(entity_id).state == "off" for entity_id in switch_entities)
+    assert float(hass.states.get(offpeak_number).state) == 6
+    assert hass.states.get(next_window).state == "unknown"
+    assert hass.states.get(offpeak_active).state == "off"
     assert float(hass.states.get(number_entity).state) == 6
     assert hass.states.get(status_entity).state == "off"
     assert hass.states.get(solar_entity).state == "unknown"
@@ -61,14 +70,14 @@ async def test_solar_budget_uses_charger_power_and_signed_grid_power(
     """Solar budget is the charger draw less net grid import."""
     _set_power(hass, "sensor.grid_power", 0.5, "kW")
     _set_power(hass, "sensor.charger_power", 1.5, "kW")
-    mode_entity = _entity_id(hass, init_integration, "select", "mode")
 
-    await hass.services.async_call(
-        "select",
-        "select_option",
-        {"entity_id": mode_entity, "option": "solar"},
-        blocking=True,
-    )
+    for key in ("enabled", "solar_enabled"):
+        await hass.services.async_call(
+            "switch",
+            "turn_on",
+            {"entity_id": _entity_id(hass, init_integration, "switch", key)},
+            blocking=True,
+        )
     await hass.async_block_till_done()
 
     solar_entity = _entity_id(hass, init_integration, "sensor", "available_solar_budget")
@@ -139,3 +148,23 @@ async def test_battery_protection_entity_is_removed_when_the_battery_sensor_is_r
     await hass.async_block_till_done()
 
     assert registry.async_get_entity_id("binary_sensor", DOMAIN, unique_id) is None
+
+
+async def test_stale_mode_select_entity_is_removed_on_setup(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """The replaced mode select does not linger as an unavailable entity."""
+    config_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    registry.async_get_or_create(
+        "select",
+        DOMAIN,
+        f"{config_entry.entry_id}_mode",
+        config_entry=config_entry,
+    )
+
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert registry.async_get_entity_id("select", DOMAIN, f"{config_entry.entry_id}_mode") is None

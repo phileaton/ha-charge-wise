@@ -23,7 +23,16 @@
           "battery_recovery_w": "Battery recovery threshold",
           "battery_confirmation_s": "Battery protection confirmation time",
           "battery_recovery_confirmation_s": "Battery recovery confirmation time",
-          "current_deadband_a": "Current adjustment deadband"
+          "current_deadband_a": "Current adjustment deadband",
+          "offpeak_window_1_start": "Off-peak window 1 start",
+          "offpeak_window_1_end": "Off-peak window 1 end",
+          "offpeak_window_1_days": "Off-peak window 1 days",
+          "offpeak_window_2_start": "Off-peak window 2 start",
+          "offpeak_window_2_end": "Off-peak window 2 end",
+          "offpeak_window_2_days": "Off-peak window 2 days",
+          "offpeak_window_3_start": "Off-peak window 3 start",
+          "offpeak_window_3_end": "Off-peak window 3 end",
+          "offpeak_window_3_days": "Off-peak window 3 days"
         },
         "data_description": {
           "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
@@ -44,7 +53,16 @@
           "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
           "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
           "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
-          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "offpeak_window_1_start": "Leave start and end empty to skip this window.",
+          "offpeak_window_1_end": "Windows may cross midnight, for example 23:00 to 06:00.",
+          "offpeak_window_1_days": "Days the window applies to, counted from the day it starts.",
+          "offpeak_window_2_start": "Optional. Leave start and end empty to skip this window.",
+          "offpeak_window_2_end": "Optional.",
+          "offpeak_window_2_days": "Optional.",
+          "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
+          "offpeak_window_3_end": "Optional.",
+          "offpeak_window_3_days": "Optional."
         }
       }
     },
@@ -56,7 +74,9 @@
       "invalid_entity": "Choose an entity from the required domain and use a different number for the current target and hardware maximum.",
       "invalid_hardware_limit": "The hardware maximum must be a valid current limit at or above the minimum operating current.",
       "invalid_limits": "The maximum current must be at least the minimum operating current.",
-      "invalid_power_unit": "Power sensors must report mW, W, or kW."
+      "invalid_power_unit": "Power sensors must report mW, W, or kW.",
+      "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
+      "offpeak_window_empty": "An off-peak window cannot start and end at the same time."
     },
     "abort": {
       "already_configured": "This charger is already configured."
@@ -86,7 +106,16 @@
           "battery_recovery_w": "Battery recovery threshold",
           "battery_confirmation_s": "Battery protection confirmation time",
           "battery_recovery_confirmation_s": "Battery recovery confirmation time",
-          "current_deadband_a": "Current adjustment deadband"
+          "current_deadband_a": "Current adjustment deadband",
+          "offpeak_window_1_start": "Off-peak window 1 start",
+          "offpeak_window_1_end": "Off-peak window 1 end",
+          "offpeak_window_1_days": "Off-peak window 1 days",
+          "offpeak_window_2_start": "Off-peak window 2 start",
+          "offpeak_window_2_end": "Off-peak window 2 end",
+          "offpeak_window_2_days": "Off-peak window 2 days",
+          "offpeak_window_3_start": "Off-peak window 3 start",
+          "offpeak_window_3_end": "Off-peak window 3 end",
+          "offpeak_window_3_days": "Off-peak window 3 days"
         },
         "data_description": {
           "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
@@ -107,9 +136,30 @@
           "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
           "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
           "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
-          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "offpeak_window_1_start": "Leave start and end empty to skip this window.",
+          "offpeak_window_1_end": "Windows may cross midnight, for example 23:00 to 06:00.",
+          "offpeak_window_1_days": "Days the window applies to, counted from the day it starts.",
+          "offpeak_window_2_start": "Optional. Leave start and end empty to skip this window.",
+          "offpeak_window_2_end": "Optional.",
+          "offpeak_window_2_days": "Optional.",
+          "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
+          "offpeak_window_3_end": "Optional.",
+          "offpeak_window_3_days": "Optional."
         }
       }
+    },
+    "error": {
+      "already_configured": "This charger switch or current target is already used by another Charge Wise entry.",
+      "entity_not_found": "One or more selected entities do not currently exist.",
+      "entity_required": "Choose all required entities.",
+      "invalid_battery_thresholds": "The battery recovery threshold must be lower than the discharge threshold.",
+      "invalid_entity": "Choose an entity from the required domain and use a different number for the current target and hardware maximum.",
+      "invalid_hardware_limit": "The hardware maximum must be a valid current limit at or above the minimum operating current.",
+      "invalid_limits": "The maximum current must be at least the minimum operating current.",
+      "invalid_power_unit": "Power sensors must report mW, W, or kW.",
+      "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
+      "offpeak_window_empty": "An off-peak window cannot start and end at the same time."
     }
   },
   "exceptions": {
@@ -121,19 +171,12 @@
     }
   },
   "entity": {
-    "select": {
-      "mode": {
-        "name": "Mode",
-        "state": {
-          "off": "Off",
-          "manual": "Manual",
-          "solar": "Solar"
-        }
-      }
-    },
     "number": {
       "manual_current": {
         "name": "Manual current"
+      },
+      "offpeak_current": {
+        "name": "Off-peak current"
       }
     },
     "sensor": {
@@ -156,8 +199,11 @@
       "decision_reason": {
         "name": "Decision reason",
         "state": {
-          "off": "Controller is off",
-          "manual": "Manual mode is active",
+          "off": "Charging is disabled",
+          "no_source": "No charging source is turned on",
+          "manual": "Manual override is active",
+          "offpeak_window": "Charging from the grid in an off-peak window",
+          "offpeak_waiting": "Waiting for the next off-peak window",
           "solar_waiting": "Waiting for the solar start threshold",
           "cooldown": "Waiting for the restart cooldown",
           "grid_unavailable": "Grid power is unavailable or invalid",
@@ -174,11 +220,40 @@
           "hardware_limit": "The hardware limit is below the minimum operating current",
           "control_failed": "A charger command failed"
         }
+      },
+      "next_offpeak_window": {
+        "name": "Next off-peak window"
       }
     },
     "binary_sensor": {
       "battery_protection": {
         "name": "Battery protection active"
+      },
+      "offpeak_active": {
+        "name": "Off-peak active"
+      }
+    },
+    "switch": {
+      "enabled": {
+        "name": "Charging enabled"
+      },
+      "solar_enabled": {
+        "name": "Solar charging"
+      },
+      "offpeak_enabled": {
+        "name": "Off-peak charging"
+      },
+      "manual_override": {
+        "name": "Manual override"
+      }
+    }
+  },
+  "selector": {
+    "offpeak_days": {
+      "options": {
+        "all": "Every day",
+        "weekdays": "Weekdays",
+        "weekends": "Weekends"
       }
     }
   }

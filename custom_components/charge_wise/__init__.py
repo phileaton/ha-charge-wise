@@ -17,6 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
+from homeassistant.helpers import entity_registry as er
 
 if TYPE_CHECKING:
     from custom_components.charge_wise.data import ChargeWiseConfigEntry
@@ -24,8 +25,8 @@ if TYPE_CHECKING:
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.NUMBER,
-    Platform.SELECT,
     Platform.SENSOR,
+    Platform.SWITCH,
 ]
 
 _REQUIRED_OPTIONS = (
@@ -48,6 +49,10 @@ async def async_setup_entry(
             translation_domain=DOMAIN,
             translation_key="legacy_entry",
         )
+
+    registry = er.async_get(hass)
+    if stale_mode := registry.async_get_entity_id("select", DOMAIN, f"{entry.entry_id}_mode"):
+        registry.async_remove(stale_mode)
 
     coordinator = ChargeWiseDataUpdateCoordinator(hass, entry)
     entry.runtime_data = ChargeWiseData(coordinator=coordinator)

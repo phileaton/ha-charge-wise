@@ -1,17 +1,10 @@
 {
   "entity": {
-    "select": {
-      "mode": {
-        "default": "mdi:ev-station",
-        "state": {
-          "off": "mdi:power-off",
-          "manual": "mdi:hand",
-          "solar": "mdi:solar-power"
-        }
-      }
-    },
     "number": {
       "manual_current": {
+        "default": "mdi:current-ac"
+      },
+      "offpeak_current": {
         "default": "mdi:current-ac"
       }
     },
@@ -27,11 +20,37 @@
       },
       "decision_reason": {
         "default": "mdi:comment-question-outline"
+      },
+      "next_offpeak_window": {
+        "default": "mdi:calendar-clock"
       }
     },
     "binary_sensor": {
       "battery_protection": {
         "default": "mdi:battery-alert-variant-outline"
+      },
+      "offpeak_active": {
+        "default": "mdi:clock-check-outline"
+      }
+    },
+    "switch": {
+      "enabled": {
+        "default": "mdi:ev-station",
+        "state": {
+          "off": "mdi:power-off"
+        }
+      },
+      "solar_enabled": {
+        "default": "mdi:solar-power",
+        "state": {
+          "off": "mdi:solar-power-variant-outline"
+        }
+      },
+      "offpeak_enabled": {
+        "default": "mdi:clock-time-three-outline"
+      },
+      "manual_override": {
+        "default": "mdi:hand-back-right"
       }
     }
   }

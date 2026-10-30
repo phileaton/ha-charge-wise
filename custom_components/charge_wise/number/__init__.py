@@ -2,7 +2,14 @@
 
 from typing import TYPE_CHECKING
 
-from custom_components.charge_wise.number.manual_current import ENTITY_DESCRIPTION, ChargeWiseManualCurrentNumber
+from custom_components.charge_wise.number.manual_current import (
+    ENTITY_DESCRIPTION as MANUAL_DESCRIPTION,
+    ChargeWiseManualCurrentNumber,
+)
+from custom_components.charge_wise.number.offpeak_current import (
+    ENTITY_DESCRIPTION as OFFPEAK_DESCRIPTION,
+    ChargeWiseOffpeakCurrentNumber,
+)
 
 PARALLEL_UPDATES = 1
 
@@ -17,7 +24,11 @@ async def async_setup_entry(
     entry: ChargeWiseConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the manual-current number entity."""
+    """Set up the manual and off-peak current number entities."""
+    coordinator = entry.runtime_data.coordinator
     async_add_entities(
-        [ChargeWiseManualCurrentNumber(entry.runtime_data.coordinator, ENTITY_DESCRIPTION)],
+        [
+            ChargeWiseManualCurrentNumber(coordinator, MANUAL_DESCRIPTION),
+            ChargeWiseOffpeakCurrentNumber(coordinator, OFFPEAK_DESCRIPTION),
+        ],
     )

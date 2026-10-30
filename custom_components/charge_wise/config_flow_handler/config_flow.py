@@ -4,6 +4,7 @@ from typing import Any
 
 from custom_components.charge_wise.config_flow_handler.options_flow import ChargeWiseOptionsFlow
 from custom_components.charge_wise.config_flow_handler.schemas import get_configuration_schema
+from custom_components.charge_wise.config_flow_handler.schemas.windows import form_to_options
 from custom_components.charge_wise.config_flow_handler.validators.configuration import validate_configuration
 from custom_components.charge_wise.const import CONF_CHARGER_SWITCH_ENTITY, DOMAIN
 from homeassistant import config_entries
@@ -40,7 +41,7 @@ class ChargeWiseConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title=title,
                     data={},
-                    options=user_input,
+                    options=form_to_options(user_input),
                 )
 
         return self.async_show_form(

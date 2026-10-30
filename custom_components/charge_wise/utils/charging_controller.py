@@ -1,17 +1,9 @@
 """Pure charging decision logic for Charge Wise."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
 from math import ceil, floor
-
-
-class ChargeWiseMode(StrEnum):
-    """Supported controller modes."""
-
-    OFF = "off"
-    MANUAL = "manual"
-    SOLAR = "solar"
 
 
 class ControllerStatus(StrEnum):
@@ -28,7 +20,10 @@ class ChargeWiseReason(StrEnum):
     """Reason for the current controller decision."""
 
     OFF = "off"
+    NO_SOURCE = "no_source"
     MANUAL = "manual"
+    OFFPEAK_WINDOW = "offpeak_window"
+    OFFPEAK_WAITING = "offpeak_waiting"
     SOLAR_WAITING = "solar_waiting"
     COOLDOWN = "cooldown"
     GRID_UNAVAILABLE = "grid_unavailable"
@@ -61,6 +56,20 @@ class ControllerConfig:
     battery_confirmation_s: int = 90
     battery_recovery_confirmation_s: int = 90
     current_deadband_a: float = 1.0
+
+
+@dataclass(frozen=True)
+class ControlSettings:
+    """User-controlled charging sources and the current off-peak window state."""
+
+    enabled: bool = False
+    solar_enabled: bool = False
+    offpeak_enabled: bool = False
+    manual_override: bool = False
+    manual_current_a: float = 6
+    offpeak_current_a: float = 6
+    offpeak_active: bool = False
+    offpeak_next_change: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -97,7 +106,7 @@ class ChargeWiseController:
     def __init__(self, config: ControllerConfig) -> None:
         """Initialize controller timers and latches."""
         self.config = config
-        self._mode = ChargeWiseMode.OFF
+        self._solar_running = False
         self._low_solar_since: datetime | None = None
         self._battery_discharge_since: datetime | None = None
         self._battery_recovery_since: datetime | None = None
@@ -106,32 +115,30 @@ class ChargeWiseController:
         self._battery_current_reduction_a = 0
         self._safety_paused = False
 
-    def set_mode(self, mode: ChargeWiseMode, now: datetime, *, restoring: bool = False) -> None:
-        """Change modes and reset transient timers when control ownership changes."""
-        if self._mode is mode:
-            return
+    def start_cooldown(self, now: datetime) -> None:
+        """Delay a Solar start after a restart so restored switches never cause an immediate start."""
+        self._cooldown_until = now + timedelta(seconds=self.config.cooldown_s)
 
-        self._mode = mode
+    def _reset_solar(self) -> None:
+        """Drop Solar timers and latches when Solar stops owning the charger."""
+        self._solar_running = False
         self._low_solar_since = None
         self._battery_discharge_since = None
         self._battery_recovery_since = None
         self._battery_protection_active = False
         self._battery_current_reduction_a = 0
         self._safety_paused = False
-        self._cooldown_until = now + timedelta(seconds=self.config.cooldown_s) if restoring else None
+        self._cooldown_until = None
 
     def evaluate(
         self,
-        mode: ChargeWiseMode,
-        manual_current_a: float,
+        settings: ControlSettings,
         readings: ControllerInput,
         now: datetime,
     ) -> ControllerDecision:
         """Return the desired charging state without performing I/O."""
-        if mode is not self._mode:
-            self.set_mode(mode, now)
-
-        if mode is ChargeWiseMode.OFF:
+        if not settings.enabled:
+            self._reset_solar()
             return self._decision(ControllerStatus.OFF, ChargeWiseReason.OFF, readings, 0, False)
 
         if readings.ev_connected_configured:
@@ -139,18 +146,70 @@ class ChargeWiseController:
                 return self._pause(ChargeWiseReason.EV_STATUS_UNAVAILABLE, readings, now)
             if not readings.ev_connected:
                 return self._pause(ChargeWiseReason.EV_DISCONNECTED, readings, now)
-
         self._safety_paused = False
-        if mode is ChargeWiseMode.MANUAL:
-            return self._evaluate_manual(manual_current_a, readings)
+
+        if settings.manual_override:
+            self._reset_solar()
+            return self._fixed_current_decision(settings.manual_current_a, ChargeWiseReason.MANUAL, readings)
+
+        solar = self._evaluate_solar_source(settings, readings, now)
+        offpeak = self._evaluate_offpeak(settings, readings)
+
+        if offpeak is not None and offpeak.charger_enabled:
+            if solar is not None and solar.charger_enabled and solar.requested_current_a >= offpeak.requested_current_a:
+                chosen = solar
+            else:
+                chosen = replace(
+                    offpeak,
+                    available_solar_w=solar.available_solar_w if solar else None,
+                    battery_protection_active=solar.battery_protection_active if solar else None,
+                )
+        elif solar is not None:
+            chosen = solar
+        elif offpeak is not None:
+            chosen = offpeak
+        elif settings.offpeak_enabled:
+            chosen = self._decision(ControllerStatus.WAITING, ChargeWiseReason.OFFPEAK_WAITING, readings, 0, False)
+        else:
+            chosen = self._decision(ControllerStatus.OFF, ChargeWiseReason.NO_SOURCE, readings, 0, False)
+
+        deadlines = [chosen.next_update_at, solar.next_update_at if solar else None]
+        if settings.offpeak_enabled:
+            deadlines.append(settings.offpeak_next_change)
+        return replace(chosen, next_update_at=self._future_deadline([d for d in deadlines if d], now))
+
+    def _evaluate_solar_source(
+        self,
+        settings: ControlSettings,
+        readings: ControllerInput,
+        now: datetime,
+    ) -> ControllerDecision | None:
+        """Run the Solar state machine only while the Solar switch is on."""
+        if not settings.solar_enabled:
+            self._reset_solar()
+            return None
+        if not self._solar_running:
+            self._solar_running = True
         return self._evaluate_solar(readings, now)
 
-    def _evaluate_manual(
+    def _evaluate_offpeak(
         self,
-        manual_current_a: float,
+        settings: ControlSettings,
+        readings: ControllerInput,
+    ) -> ControllerDecision | None:
+        """Charge from the grid at the off-peak current while a window is active."""
+        if not settings.offpeak_enabled or not settings.offpeak_active:
+            return None
+        decision = self._fixed_current_decision(settings.offpeak_current_a, ChargeWiseReason.OFFPEAK_WINDOW, readings)
+        return replace(decision, next_update_at=settings.offpeak_next_change)
+
+    def _fixed_current_decision(
+        self,
+        current_a: float,
+        reason: ChargeWiseReason,
         readings: ControllerInput,
     ) -> ControllerDecision:
-        """Apply the manual target within configured and hardware limits."""
+        """Apply a fixed target within configured and hardware limits."""
         maximum = self._effective_maximum(readings)
         if maximum < self.config.minimum_current_a:
             return self._decision(
@@ -160,8 +219,8 @@ class ChargeWiseController:
                 0,
                 False,
             )
-        target = min(max(manual_current_a, self.config.minimum_current_a), maximum)
-        return self._decision(ControllerStatus.CHARGING, ChargeWiseReason.MANUAL, readings, target, True)
+        target = min(max(current_a, self.config.minimum_current_a), maximum)
+        return self._decision(ControllerStatus.CHARGING, reason, readings, target, True)
 
     def _evaluate_solar(self, readings: ControllerInput, now: datetime) -> ControllerDecision:
         """Calculate a Solar target after validating all configured safety inputs."""

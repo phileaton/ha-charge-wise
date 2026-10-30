@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from custom_components.charge_wise.coordinator.data import ChargeWiseSnapshot
 from custom_components.charge_wise.entity import ChargeWiseEntity
@@ -13,7 +14,7 @@ from homeassistant.helpers.typing import StateType
 class ChargeWiseSensorEntityDescription(SensorEntityDescription):
     """Describe how a sensor reads the coordinator snapshot."""
 
-    value_fn: Callable[[ChargeWiseSnapshot], StateType]
+    value_fn: Callable[[ChargeWiseSnapshot], StateType | datetime]
 
 
 class ChargeWiseSensor(SensorEntity, ChargeWiseEntity):
@@ -22,6 +23,6 @@ class ChargeWiseSensor(SensorEntity, ChargeWiseEntity):
     entity_description: ChargeWiseSensorEntityDescription
 
     @property
-    def native_value(self) -> StateType:
+    def native_value(self) -> StateType | datetime:
         """Return the snapshot value selected by the entity description."""
         return self.entity_description.value_fn(self.coordinator.data)

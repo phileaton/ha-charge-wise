@@ -5,7 +5,7 @@ shown in your Home Assistant entity picker.
 
 ## Automations
 
-### Select Solar mode when the EV connects
+### Turn on Solar charging when the EV connects
 
 Use the same EV-connected binary sensor selected in the Charge Wise configuration:
 
@@ -16,53 +16,33 @@ triggers:
     entity_id: binary_sensor.ev_connected
     to: "on"
 actions:
-  - action: select.select_option
+  - action: switch.turn_on
     target:
-      entity_id: select.garage_charger_mode
-    data:
-      option: solar
+      entity_id:
+        - switch.garage_charger_charging_enabled
+        - switch.garage_charger_solar_charging
 mode: single
 ```
 
-### Schedule a Manual charging window
+### Charge overnight on a cheap tariff
 
-This example requests 12 A in Manual mode from 01:00 to 05:00. Choose a current and schedule suitable for your
-installation. This is a fixed schedule; Charge Wise does not compare tariffs or electricity prices.
+Configure an off-peak window such as 23:00 to 06:00 in the options form, set **Off-peak current** and turn on
+**Off-peak charging**. Charge Wise starts and stops at the window edges without an automation. With **Solar charging**
+also on, Solar continues outside the window.
 
 ```yaml
-alias: Charge manually overnight
+alias: Enable off-peak charging
 triggers:
-  - trigger: time
-    at: "01:00:00"
+  - trigger: homeassistant
+    event: start
 actions:
-  - action: number.set_value
+  - action: switch.turn_on
     target:
-      entity_id: number.garage_charger_manual_current
-    data:
-      value: 12
-  - action: select.select_option
-    target:
-      entity_id: select.garage_charger_mode
-    data:
-      option: manual
+      entity_id: switch.garage_charger_off_peak_charging
 mode: single
 ```
 
-Create a second automation to return the controller to Off:
-
-```yaml
-alias: Stop the overnight charging window
-triggers:
-  - trigger: time
-    at: "05:00:00"
-actions:
-  - action: select.select_option
-    target:
-      entity_id: select.garage_charger_mode
-    data:
-      option: off
-mode: single
-```
+Charge Wise does not compare tariffs or electricity prices; the windows are fixed times you enter.
 
 ## Dashboard
 

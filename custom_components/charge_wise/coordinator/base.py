@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from math import isclose, isfinite
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from custom_components.charge_wise.const import (
     BATTERY_SIGN_NEGATIVE,
@@ -24,6 +24,7 @@ from custom_components.charge_wise.const import (
     CONF_LOW_SOLAR_CONFIRMATION_S,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
+    CONF_OFFPEAK_WINDOWS,
     CONF_SOLAR_START_W,
     CONF_VOLTAGE_V,
     DEFAULT_BATTERY_CONFIRMATION_S,
@@ -43,13 +44,14 @@ from custom_components.charge_wise.const import (
 from custom_components.charge_wise.coordinator.data import ChargeWiseSnapshot
 from custom_components.charge_wise.utils.charging_controller import (
     ChargeWiseController,
-    ChargeWiseMode,
     ChargeWiseReason,
     ControllerConfig,
     ControllerDecision,
     ControllerInput,
     ControllerStatus,
+    ControlSettings,
 )
+from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfPower
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -67,6 +69,9 @@ _POWER_FACTORS: dict[str, float] = {
 }
 
 
+type SwitchKey = Literal["enabled", "solar_enabled", "offpeak_enabled", "manual_override"]
+
+
 class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot]):
     """Keep a shared snapshot current from Home Assistant entity state changes."""
 
@@ -74,8 +79,15 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Initialize controller state from config-entry options."""
         self.entry = entry
         self.options = entry.options
-        self.mode = ChargeWiseMode.OFF
+        self.switches: dict[SwitchKey, bool] = {
+            "enabled": False,
+            "solar_enabled": False,
+            "offpeak_enabled": False,
+            "manual_override": False,
+        }
         self.manual_current_a = float(self.options[CONF_MINIMUM_CURRENT_A])
+        self.offpeak_current_a = self.manual_current_a
+        self.windows = windows_from_options(self.options.get(CONF_OFFPEAK_WINDOWS))
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
         self._timer_unsub: Any = None
@@ -114,17 +126,23 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             always_update=False,
         )
         self.data = ChargeWiseSnapshot(
-            mode=ChargeWiseMode.OFF,
+            enabled=False,
+            solar_enabled=False,
+            offpeak_enabled=False,
+            manual_override=False,
+            offpeak_active=False,
+            next_offpeak_start=None,
             status=ControllerStatus.OFF,
             reason=ChargeWiseReason.OFF,
             available_solar_w=None,
             requested_current_a=0.0,
             manual_current_a=self.manual_current_a,
+            offpeak_current_a=self.offpeak_current_a,
             battery_protection_active=False if self.battery_configured else None,
         )
 
     async def async_start(self) -> None:
-        """Subscribe to inputs and enforce the safe initial Off mode."""
+        """Subscribe to inputs and start with every charging source off."""
         entity_ids = {
             self.options[key]
             for key in (
@@ -152,21 +170,21 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self._state_unsub = None
         self._cancel_timer()
 
-    async def async_set_mode(self, mode: ChargeWiseMode) -> None:
-        """Apply a mode selected by the user."""
-        self.mode = mode
-        self.controller.set_mode(mode, dt_util.utcnow())
-        await self._async_evaluate()
-
-    async def async_restore_mode(self, mode: ChargeWiseMode) -> None:
-        """Restore a prior mode but wait through the safety cooldown before charging."""
-        self.mode = mode
-        self.controller.set_mode(mode, dt_util.utcnow(), restoring=True)
+    async def async_set_switch(self, key: SwitchKey, value: bool, *, restoring: bool = False) -> None:
+        """Turn a charging source on or off; a restored source waits through the safety cooldown."""
+        self.switches[key] = value
+        if restoring and value:
+            self.controller.start_cooldown(dt_util.utcnow())
         await self._async_evaluate()
 
     async def async_set_manual_current(self, current_a: float) -> None:
-        """Store a manual target and immediately re-evaluate Manual mode."""
+        """Store a manual target and immediately re-evaluate."""
         self.manual_current_a = current_a
+        await self._async_evaluate()
+
+    async def async_set_offpeak_current(self, current_a: float) -> None:
+        """Store the off-peak target and immediately re-evaluate."""
+        self.offpeak_current_a = current_a
         await self._async_evaluate()
 
     @callback
@@ -188,39 +206,67 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
     async def _async_evaluate_locked(self) -> None:
         """Calculate, apply, and publish one controller decision at a time."""
         now = dt_util.utcnow()
-        readings = self._read_inputs()
-        decision = self.controller.evaluate(self.mode, self.manual_current_a, readings, now)
+        local_now = dt_util.as_local(now)
+        offpeak_active = self.switches["offpeak_enabled"] and is_active(self.windows, local_now)
+        settings = ControlSettings(
+            enabled=self.switches["enabled"],
+            solar_enabled=self.switches["solar_enabled"],
+            offpeak_enabled=self.switches["offpeak_enabled"],
+            manual_override=self.switches["manual_override"],
+            manual_current_a=self.manual_current_a,
+            offpeak_current_a=self.offpeak_current_a,
+            offpeak_active=offpeak_active,
+            offpeak_next_change=next_change(self.windows, local_now),
+        )
+        decision = self.controller.evaluate(settings, self._read_inputs(), now)
+        next_start_at = next_start(self.windows, local_now) if self.switches["offpeak_enabled"] else None
         try:
             await self._async_apply_decision(decision)
         except HomeAssistantError:
             LOGGER.exception("Failed to apply charger control decision")
             await self._async_fail_safe()
             self.async_set_updated_data(
-                ChargeWiseSnapshot(
-                    mode=self.mode,
+                self._snapshot(
+                    decision,
+                    offpeak_active,
+                    next_start_at,
                     status=ControllerStatus.ERROR,
                     reason=ChargeWiseReason.CONTROL_FAILED,
-                    available_solar_w=decision.available_solar_w,
                     requested_current_a=0.0,
-                    manual_current_a=self.manual_current_a,
-                    battery_protection_active=decision.battery_protection_active,
                 ),
             )
             self._cancel_timer()
             return
 
-        self.async_set_updated_data(
-            ChargeWiseSnapshot(
-                mode=self.mode,
-                status=decision.status,
-                reason=decision.reason,
-                available_solar_w=decision.available_solar_w,
-                requested_current_a=decision.requested_current_a,
-                manual_current_a=self.manual_current_a,
-                battery_protection_active=decision.battery_protection_active,
-            ),
-        )
+        self.async_set_updated_data(self._snapshot(decision, offpeak_active, next_start_at))
         self._schedule_timer(decision)
+
+    def _snapshot(
+        self,
+        decision: ControllerDecision,
+        offpeak_active: bool,
+        next_offpeak_start: datetime | None,
+        *,
+        status: ControllerStatus | None = None,
+        reason: ChargeWiseReason | None = None,
+        requested_current_a: float | None = None,
+    ) -> ChargeWiseSnapshot:
+        """Combine a controller decision with user switches for entities."""
+        return ChargeWiseSnapshot(
+            enabled=self.switches["enabled"],
+            solar_enabled=self.switches["solar_enabled"],
+            offpeak_enabled=self.switches["offpeak_enabled"],
+            manual_override=self.switches["manual_override"],
+            offpeak_active=offpeak_active,
+            next_offpeak_start=next_offpeak_start,
+            status=status or decision.status,
+            reason=reason or decision.reason,
+            available_solar_w=decision.available_solar_w,
+            requested_current_a=decision.requested_current_a if requested_current_a is None else requested_current_a,
+            manual_current_a=self.manual_current_a,
+            offpeak_current_a=self.offpeak_current_a,
+            battery_protection_active=decision.battery_protection_active,
+        )
 
     def _read_inputs(self) -> ControllerInput:
         """Read and normalize the currently configured Home Assistant entities."""

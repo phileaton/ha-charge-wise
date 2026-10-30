@@ -20,7 +20,7 @@ ENTITY_DESCRIPTION = NumberEntityDescription(
 
 
 class ChargeWiseManualCurrentNumber(NumberEntity, RestoreEntity, ChargeWiseEntity):
-    """Set the current target used by Manual mode."""
+    """Set the current target used by the manual override."""
 
     entity_description = ENTITY_DESCRIPTION
 
@@ -52,7 +52,7 @@ class ChargeWiseManualCurrentNumber(NumberEntity, RestoreEntity, ChargeWiseEntit
             await self.coordinator.async_set_manual_current(current_a)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Store the requested current and apply it when Manual mode is active."""
+        """Store the requested current and apply it while the manual override is on."""
         if not self.native_min_value <= value <= self.native_max_value:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
