@@ -1,5 +1,5 @@
 """Schemas for Charge Wise configuration forms."""
 
-from .config import get_configuration_schema
+from .pages import PAGE_SCHEMAS, PAGES
 
-__all__ = ["get_configuration_schema"]
+__all__ = ["PAGES", "PAGE_SCHEMAS"]

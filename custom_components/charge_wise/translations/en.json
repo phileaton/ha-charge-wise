@@ -3,36 +3,70 @@
     "step": {
       "user": {
         "title": "Connect charger entities",
-        "description": "Choose the Home Assistant entities Charge Wise will monitor and control.",
+        "description": "Choose the Home Assistant entities Charge Wise will monitor and control, and the current limits.",
         "data": {
           "grid_power_entity": "Net grid power sensor",
           "charger_power_entity": "Measured charger power sensor",
           "charger_switch_entity": "Charger on/off switch",
           "current_target_entity": "Active current target",
           "hardware_maximum_entity": "Hardware maximum current",
-          "battery_power_entity": "Battery power sensor",
-          "battery_discharge_sign": "Battery discharge sign",
           "ev_connected_entity": "EV connected sensor",
           "minimum_current_a": "Minimum operating current",
           "maximum_current_a": "Safe maximum current",
-          "voltage_v": "Charging voltage",
+          "voltage_v": "Charging voltage"
+        },
+        "data_description": {
+          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
+          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
+          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
+          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
+          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
+          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
+          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
+          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
+          "voltage_v": "Single-phase voltage used to convert available power to current."
+        }
+      },
+      "solar": {
+        "title": "Solar charging",
+        "description": "When Solar charging starts and stops, and how finely the current is adjusted.",
+        "data": {
           "solar_start_w": "Solar start threshold",
           "low_solar_confirmation_s": "Low-solar confirmation time",
           "cooldown_s": "Restart cooldown",
+          "current_deadband_a": "Current adjustment deadband"
+        },
+        "data_description": {
+          "solar_start_w": "Minimum available solar power required to start charging.",
+          "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
+          "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
+        }
+      },
+      "battery": {
+        "title": "Battery protection",
+        "description": "Optionally pause charging when the home battery discharges too much. Leave the sensor empty to skip protection.",
+        "data": {
+          "battery_power_entity": "Battery power sensor",
+          "battery_discharge_sign": "Battery discharge sign",
           "battery_discharge_w": "Battery discharge threshold",
           "battery_recovery_w": "Battery recovery threshold",
           "battery_confirmation_s": "Battery protection confirmation time",
-          "battery_recovery_confirmation_s": "Battery recovery confirmation time",
-          "current_deadband_a": "Current adjustment deadband",
-          "offpeak_window_1_start": "Off-peak window 1 start",
-          "offpeak_window_1_end": "Off-peak window 1 end",
-          "offpeak_window_1_days": "Off-peak window 1 days",
-          "offpeak_window_2_start": "Off-peak window 2 start",
-          "offpeak_window_2_end": "Off-peak window 2 end",
-          "offpeak_window_2_days": "Off-peak window 2 days",
-          "offpeak_window_3_start": "Off-peak window 3 start",
-          "offpeak_window_3_end": "Off-peak window 3 end",
-          "offpeak_window_3_days": "Off-peak window 3 days",
+          "battery_recovery_confirmation_s": "Battery recovery confirmation time"
+        },
+        "data_description": {
+          "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
+          "battery_discharge_sign": "Choose whether battery discharge is reported as positive or negative power.",
+          "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
+          "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
+          "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
+          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears."
+        }
+      },
+      "forecast": {
+        "title": "EV-first charging",
+        "description": "Optionally let the EV use power that would charge the home battery when the solar forecast covers the battery's need. Set the four inputs together or leave them empty.",
+        "data": {
           "forecast_remaining_entity": "Solar forecast remaining today",
           "battery_level_entity": "Battery level",
           "house_power_entity": "Average house consumption",
@@ -41,25 +75,29 @@
           "forecast_trust_percent": "Forecast trust (%)"
         },
         "data_description": {
-          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
-          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
-          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
-          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
-          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
-          "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
-          "battery_discharge_sign": "Choose whether battery discharge is reported as positive or negative power.",
-          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
-          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
-          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
-          "voltage_v": "Single-phase voltage used to convert available power to current.",
-          "solar_start_w": "Minimum available solar power required to start charging.",
-          "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
-          "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
-          "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
-          "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
-          "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
-          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
-          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
+          "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
+          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
+          "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
+          "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
+          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
+        }
+      },
+      "offpeak": {
+        "title": "Off-peak windows",
+        "description": "Set up to three windows when Off-peak charging may use the grid. Leave start and end empty to skip a window.",
+        "data": {
+          "offpeak_window_1_start": "Off-peak window 1 start",
+          "offpeak_window_1_end": "Off-peak window 1 end",
+          "offpeak_window_1_days": "Off-peak window 1 days",
+          "offpeak_window_2_start": "Off-peak window 2 start",
+          "offpeak_window_2_end": "Off-peak window 2 end",
+          "offpeak_window_2_days": "Off-peak window 2 days",
+          "offpeak_window_3_start": "Off-peak window 3 start",
+          "offpeak_window_3_end": "Off-peak window 3 end",
+          "offpeak_window_3_days": "Off-peak window 3 days"
+        },
+        "data_description": {
           "offpeak_window_1_start": "Leave start and end empty to skip this window.",
           "offpeak_window_1_end": "Windows may cross midnight, for example 23:00 to 06:00.",
           "offpeak_window_1_days": "Days the window applies to, counted from the day it starts.",
@@ -68,13 +106,7 @@
           "offpeak_window_2_days": "Optional.",
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
-          "offpeak_window_3_days": "Optional.",
-          "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
-          "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
-          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
-          "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
-          "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
+          "offpeak_window_3_days": "Optional."
         }
       }
     },
@@ -99,37 +131,71 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure Charge Wise",
-        "description": "Update the selected entities and charging safeguards.",
+        "title": "Connect charger entities",
+        "description": "Choose the Home Assistant entities Charge Wise will monitor and control, and the current limits.",
         "data": {
           "grid_power_entity": "Net grid power sensor",
           "charger_power_entity": "Measured charger power sensor",
           "charger_switch_entity": "Charger on/off switch",
           "current_target_entity": "Active current target",
           "hardware_maximum_entity": "Hardware maximum current",
-          "battery_power_entity": "Battery power sensor",
-          "battery_discharge_sign": "Battery discharge sign",
           "ev_connected_entity": "EV connected sensor",
           "minimum_current_a": "Minimum operating current",
           "maximum_current_a": "Safe maximum current",
-          "voltage_v": "Charging voltage",
+          "voltage_v": "Charging voltage"
+        },
+        "data_description": {
+          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
+          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
+          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
+          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
+          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
+          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
+          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
+          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
+          "voltage_v": "Single-phase voltage used to convert available power to current."
+        }
+      },
+      "solar": {
+        "title": "Solar charging",
+        "description": "When Solar charging starts and stops, and how finely the current is adjusted.",
+        "data": {
           "solar_start_w": "Solar start threshold",
           "low_solar_confirmation_s": "Low-solar confirmation time",
           "cooldown_s": "Restart cooldown",
+          "current_deadband_a": "Current adjustment deadband"
+        },
+        "data_description": {
+          "solar_start_w": "Minimum available solar power required to start charging.",
+          "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
+          "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
+        }
+      },
+      "battery": {
+        "title": "Battery protection",
+        "description": "Optionally pause charging when the home battery discharges too much. Leave the sensor empty to skip protection.",
+        "data": {
+          "battery_power_entity": "Battery power sensor",
+          "battery_discharge_sign": "Battery discharge sign",
           "battery_discharge_w": "Battery discharge threshold",
           "battery_recovery_w": "Battery recovery threshold",
           "battery_confirmation_s": "Battery protection confirmation time",
-          "battery_recovery_confirmation_s": "Battery recovery confirmation time",
-          "current_deadband_a": "Current adjustment deadband",
-          "offpeak_window_1_start": "Off-peak window 1 start",
-          "offpeak_window_1_end": "Off-peak window 1 end",
-          "offpeak_window_1_days": "Off-peak window 1 days",
-          "offpeak_window_2_start": "Off-peak window 2 start",
-          "offpeak_window_2_end": "Off-peak window 2 end",
-          "offpeak_window_2_days": "Off-peak window 2 days",
-          "offpeak_window_3_start": "Off-peak window 3 start",
-          "offpeak_window_3_end": "Off-peak window 3 end",
-          "offpeak_window_3_days": "Off-peak window 3 days",
+          "battery_recovery_confirmation_s": "Battery recovery confirmation time"
+        },
+        "data_description": {
+          "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
+          "battery_discharge_sign": "Choose whether battery discharge is reported as positive or negative power.",
+          "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
+          "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
+          "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
+          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears."
+        }
+      },
+      "forecast": {
+        "title": "EV-first charging",
+        "description": "Optionally let the EV use power that would charge the home battery when the solar forecast covers the battery's need. Set the four inputs together or leave them empty.",
+        "data": {
           "forecast_remaining_entity": "Solar forecast remaining today",
           "battery_level_entity": "Battery level",
           "house_power_entity": "Average house consumption",
@@ -138,25 +204,29 @@
           "forecast_trust_percent": "Forecast trust (%)"
         },
         "data_description": {
-          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
-          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
-          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
-          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
-          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
-          "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
-          "battery_discharge_sign": "Choose whether battery discharge is reported as positive or negative power.",
-          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
-          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
-          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
-          "voltage_v": "Single-phase voltage used to convert available power to current.",
-          "solar_start_w": "Minimum available solar power required to start charging.",
-          "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
-          "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
-          "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
-          "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
-          "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
-          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
-          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
+          "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
+          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
+          "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
+          "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
+          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
+        }
+      },
+      "offpeak": {
+        "title": "Off-peak windows",
+        "description": "Set up to three windows when Off-peak charging may use the grid. Leave start and end empty to skip a window.",
+        "data": {
+          "offpeak_window_1_start": "Off-peak window 1 start",
+          "offpeak_window_1_end": "Off-peak window 1 end",
+          "offpeak_window_1_days": "Off-peak window 1 days",
+          "offpeak_window_2_start": "Off-peak window 2 start",
+          "offpeak_window_2_end": "Off-peak window 2 end",
+          "offpeak_window_2_days": "Off-peak window 2 days",
+          "offpeak_window_3_start": "Off-peak window 3 start",
+          "offpeak_window_3_end": "Off-peak window 3 end",
+          "offpeak_window_3_days": "Off-peak window 3 days"
+        },
+        "data_description": {
           "offpeak_window_1_start": "Leave start and end empty to skip this window.",
           "offpeak_window_1_end": "Windows may cross midnight, for example 23:00 to 06:00.",
           "offpeak_window_1_days": "Days the window applies to, counted from the day it starts.",
@@ -165,13 +235,7 @@
           "offpeak_window_2_days": "Optional.",
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
-          "offpeak_window_3_days": "Optional.",
-          "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
-          "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
-          "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
-          "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
-          "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
+          "offpeak_window_3_days": "Optional."
         }
       }
     },

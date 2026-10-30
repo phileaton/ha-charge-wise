@@ -1,6 +1,6 @@
-"""Selectors and defaults for Charge Wise setup and options."""
+"""Selectors and defaults for each page of the Charge Wise setup and options flows."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import probatio
@@ -55,50 +55,28 @@ _SWITCH_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain=
 _NUMBER_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="number"))
 _BINARY_SENSOR_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="binary_sensor"))
 
+type Schema = dict[probatio.Marker, selector.Selector]
 
-def get_configuration_schema(defaults: Mapping[str, Any] | None = None) -> probatio.Schema:
-    """Build the complete setup or options form schema."""
-    defaults = defaults or {}
-    schema: dict[probatio.Marker, selector.Selector] = {
+
+def charger_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
+    """Build the page that selects the charger entities and its current limits."""
+    schema: Schema = {
         probatio.Required(CONF_GRID_POWER_ENTITY): _SENSOR_SELECTOR,
         probatio.Required(CONF_CHARGER_POWER_ENTITY): _SENSOR_SELECTOR,
         probatio.Required(CONF_CHARGER_SWITCH_ENTITY): _SWITCH_SELECTOR,
         probatio.Required(CONF_CURRENT_TARGET_ENTITY): _NUMBER_SELECTOR,
         probatio.Optional(CONF_HARDWARE_MAXIMUM_ENTITY): _NUMBER_SELECTOR,
-        probatio.Optional(CONF_BATTERY_POWER_ENTITY): _SENSOR_SELECTOR,
-        probatio.Required(
-            CONF_BATTERY_DISCHARGE_SIGN,
-            default=defaults.get(CONF_BATTERY_DISCHARGE_SIGN, DEFAULT_BATTERY_DISCHARGE_SIGN),
-        ): selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=[BATTERY_SIGN_POSITIVE, BATTERY_SIGN_NEGATIVE],
-                mode=selector.SelectSelectorMode.DROPDOWN,
-            ),
-        ),
         probatio.Optional(CONF_EV_CONNECTED_ENTITY): _BINARY_SENSOR_SELECTOR,
     }
-
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_MINIMUM_CURRENT_A,
-        DEFAULT_MINIMUM_CURRENT_A,
-        minimum=1,
-        maximum=32,
-        step=1,
-        unit="A",
-    )
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_MAXIMUM_CURRENT_A,
-        None,
-        minimum=1,
-        maximum=80,
-        step=1,
-        unit="A",
-    )
+    _add_number_field(schema, defaults, CONF_MINIMUM_CURRENT_A, DEFAULT_MINIMUM_CURRENT_A, 1, 32, 1, "A")
+    _add_number_field(schema, defaults, CONF_MAXIMUM_CURRENT_A, None, 1, 80, 1, "A")
     _add_number_field(schema, defaults, CONF_VOLTAGE_V, DEFAULT_VOLTAGE_V, 100, 300, 1, "V")
+    return probatio.Schema(schema)
+
+
+def solar_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
+    """Build the page with the Solar start and stop timing."""
+    schema: Schema = {}
     _add_number_field(schema, defaults, CONF_SOLAR_START_W, DEFAULT_SOLAR_START_W, 100, 100_000, 100, "W")
     _add_number_field(
         schema,
@@ -111,36 +89,27 @@ def get_configuration_schema(defaults: Mapping[str, Any] | None = None) -> proba
         "s",
     )
     _add_number_field(schema, defaults, CONF_COOLDOWN_S, DEFAULT_COOLDOWN_S, 0, 3600, 1, "s")
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_BATTERY_DISCHARGE_W,
-        DEFAULT_BATTERY_DISCHARGE_W,
-        1,
-        100_000,
-        1,
-        "W",
-    )
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_BATTERY_RECOVERY_W,
-        DEFAULT_BATTERY_RECOVERY_W,
-        0,
-        100_000,
-        1,
-        "W",
-    )
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_BATTERY_CONFIRMATION_S,
-        DEFAULT_BATTERY_CONFIRMATION_S,
-        1,
-        600,
-        1,
-        "s",
-    )
+    _add_number_field(schema, defaults, CONF_CURRENT_DEADBAND_A, DEFAULT_CURRENT_DEADBAND_A, 0, 10, 0.5, "A")
+    return probatio.Schema(schema)
+
+
+def battery_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
+    """Build the page for battery discharge protection."""
+    schema: Schema = {
+        probatio.Optional(CONF_BATTERY_POWER_ENTITY): _SENSOR_SELECTOR,
+        probatio.Required(
+            CONF_BATTERY_DISCHARGE_SIGN,
+            default=defaults.get(CONF_BATTERY_DISCHARGE_SIGN, DEFAULT_BATTERY_DISCHARGE_SIGN),
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[BATTERY_SIGN_POSITIVE, BATTERY_SIGN_NEGATIVE],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            ),
+        ),
+    }
+    _add_number_field(schema, defaults, CONF_BATTERY_DISCHARGE_W, DEFAULT_BATTERY_DISCHARGE_W, 1, 100_000, 1, "W")
+    _add_number_field(schema, defaults, CONF_BATTERY_RECOVERY_W, DEFAULT_BATTERY_RECOVERY_W, 0, 100_000, 1, "W")
+    _add_number_field(schema, defaults, CONF_BATTERY_CONFIRMATION_S, DEFAULT_BATTERY_CONFIRMATION_S, 1, 600, 1, "s")
     _add_number_field(
         schema,
         defaults,
@@ -151,54 +120,50 @@ def get_configuration_schema(defaults: Mapping[str, Any] | None = None) -> proba
         1,
         "s",
     )
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_CURRENT_DEADBAND_A,
-        DEFAULT_CURRENT_DEADBAND_A,
-        0,
-        10,
-        0.5,
-        "A",
-    )
-    schema[probatio.Optional(CONF_FORECAST_REMAINING_ENTITY)] = _SENSOR_SELECTOR
-    schema[probatio.Optional(CONF_BATTERY_LEVEL_ENTITY)] = _SENSOR_SELECTOR
-    schema[probatio.Optional(CONF_HOUSE_POWER_ENTITY)] = _SENSOR_SELECTOR
-    schema[probatio.Optional(CONF_BATTERY_CAPACITY_KWH)] = selector.NumberSelector(
-        selector.NumberSelectorConfig(
-            min=1,
-            max=500,
-            step=0.1,
-            unit_of_measurement="kWh",
-            mode=selector.NumberSelectorMode.BOX,
+    return probatio.Schema(schema)
+
+
+def forecast_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
+    """Build the page for forecast-based EV-first charging."""
+    schema: Schema = {
+        probatio.Optional(CONF_FORECAST_REMAINING_ENTITY): _SENSOR_SELECTOR,
+        probatio.Optional(CONF_BATTERY_LEVEL_ENTITY): _SENSOR_SELECTOR,
+        probatio.Optional(CONF_HOUSE_POWER_ENTITY): _SENSOR_SELECTOR,
+        probatio.Optional(CONF_BATTERY_CAPACITY_KWH): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1,
+                max=500,
+                step=0.1,
+                unit_of_measurement="kWh",
+                mode=selector.NumberSelectorMode.BOX,
+            ),
         ),
-    )
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_BATTERY_TARGET_PERCENT,
-        DEFAULT_BATTERY_TARGET_PERCENT,
-        1,
-        100,
-        1,
-        "%",
-    )
-    _add_number_field(
-        schema,
-        defaults,
-        CONF_FORECAST_TRUST_PERCENT,
-        DEFAULT_FORECAST_TRUST_PERCENT,
-        1,
-        100,
-        1,
-        "%",
-    )
+    }
+    _add_number_field(schema, defaults, CONF_BATTERY_TARGET_PERCENT, DEFAULT_BATTERY_TARGET_PERCENT, 1, 100, 1, "%")
+    _add_number_field(schema, defaults, CONF_FORECAST_TRUST_PERCENT, DEFAULT_FORECAST_TRUST_PERCENT, 1, 100, 1, "%")
+    return probatio.Schema(schema)
+
+
+def offpeak_schema(_defaults: Mapping[str, Any]) -> probatio.Schema:
+    """Build the page with the off-peak windows."""
+    schema: Schema = {}
     add_window_fields(schema)
     return probatio.Schema(schema)
 
 
+PAGES = ("charger", "solar", "battery", "forecast", "offpeak")
+
+PAGE_SCHEMAS: dict[str, Callable[[Mapping[str, Any]], probatio.Schema]] = {
+    "charger": charger_schema,
+    "solar": solar_schema,
+    "battery": battery_schema,
+    "forecast": forecast_schema,
+    "offpeak": offpeak_schema,
+}
+
+
 def _add_number_field(
-    schema: dict[probatio.Marker, selector.Selector],
+    schema: Schema,
     defaults: Mapping[str, Any],
     key: str,
     default: float | None,
@@ -226,4 +191,4 @@ def _add_number_field(
     )
 
 
-__all__ = ["get_configuration_schema"]
+__all__ = ["PAGES", "PAGE_SCHEMAS"]

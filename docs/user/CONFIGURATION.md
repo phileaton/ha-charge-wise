@@ -3,6 +3,10 @@
 Charge Wise uses selected Home Assistant entities as inputs and controls one charger per entry. You can change the
 entity mappings and controller limits later through the integration's **Configure** screen.
 
+Setup and **Configure** both walk five pages: **Charger** (entities and current limits), **Solar charging**,
+**Battery protection**, **EV-first charging** and **Off-peak windows**. The last page saves everything; nothing is
+stored if you close the dialog earlier. Pages with optional features can be submitted as they are.
+
 ## Entity inputs
 
 | Input                    | Required | Expected entity/value                                                    |
