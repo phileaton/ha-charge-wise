@@ -59,10 +59,11 @@ will still reach its target by sunset. Set all four of these in the setup or opt
 
 - **Solar forecast remaining today**: an energy sensor in Wh, kWh or MWh, such as Forecast.Solar.
 - **Battery level**: a percent sensor.
-- **House power**: a sensor with the current house consumption, excluding the charger.
+- **Solar production power**: a power sensor with the current solar production.
 - **Battery capacity (kWh)**.
 
-Charge Wise learns your consumption from the house power sensor: a time-weighted moving average per hour of day,
+Charge Wise works out house consumption as solar production plus grid import plus battery discharge, minus the
+charger's power (grid and battery power come from the sensors set on earlier pages). It learns from that: a time-weighted moving average per hour of day,
 seeded with the current reading, so the estimate is usable immediately and improves as data arrives. It is saved across
 restarts and shown by the diagnostic **Average house consumption** sensor. The **learning window** (default 3 days)
 sets how quickly it adapts.

@@ -9,7 +9,7 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_CAPACITY_KWH,
     CONF_BATTERY_LEVEL_ENTITY,
     CONF_FORECAST_REMAINING_ENTITY,
-    CONF_HOUSE_POWER_ENTITY,
+    CONF_SOLAR_POWER_ENTITY,
     DOMAIN,
 )
 from homeassistant.core import HomeAssistant
@@ -37,7 +37,7 @@ async def ev_first_entry(hass: HomeAssistant, config_entry: MockConfigEntry) -> 
     """Set up an entry with the EV-first inputs configured and a sunny forecast."""
     hass.states.async_set("sensor.forecast_remaining", "20", {"unit_of_measurement": "kWh"})
     hass.states.async_set("sensor.battery_level", "50", {"unit_of_measurement": "%"})
-    hass.states.async_set("sensor.house_power", "500", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.solar_production", "500", {"unit_of_measurement": "W"})
     hass.states.async_set("sensor.battery_power", "-2000", {"unit_of_measurement": "W"})
     _set_sun(hass, 6)
     config_entry.add_to_hass(hass)
@@ -47,7 +47,7 @@ async def ev_first_entry(hass: HomeAssistant, config_entry: MockConfigEntry) -> 
             **config_entry.options,
             CONF_FORECAST_REMAINING_ENTITY: "sensor.forecast_remaining",
             CONF_BATTERY_LEVEL_ENTITY: "sensor.battery_level",
-            CONF_HOUSE_POWER_ENTITY: "sensor.house_power",
+            CONF_SOLAR_POWER_ENTITY: "sensor.solar_production",
             CONF_BATTERY_CAPACITY_KWH: 27,
         },
     )
@@ -98,3 +98,22 @@ async def test_ev_first_switch_is_refused_without_forecast_inputs(
             {"entity_id": _entity_id(hass, init_integration, "switch", "ev_first_enabled")},
             blocking=True,
         )
+
+
+async def test_house_power_is_production_plus_grid_and_battery_less_charger(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+) -> None:
+    """House use excludes the charger and counts battery discharge, not charging."""
+    watts = {"unit_of_measurement": "W"}
+    hass.states.async_set("sensor.solar_production", "3000", watts)
+    hass.states.async_set("sensor.grid_power", "-500", watts)
+    hass.states.async_set("sensor.charger_power", "1000", watts)
+    hass.states.async_set("sensor.battery_power", "400", watts)
+    await hass.async_block_till_done()
+    coordinator = ev_first_entry.runtime_data.coordinator
+
+    assert coordinator._house_power_w() == 1900  # noqa: SLF001
+
+    hass.states.async_set("sensor.solar_production", "unavailable", watts)
+    assert coordinator._house_power_w() is None  # noqa: SLF001

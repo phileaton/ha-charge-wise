@@ -17,9 +17,9 @@ from custom_components.charge_wise.const import (
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
-    CONF_HOUSE_POWER_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
+    CONF_SOLAR_POWER_ENTITY,
     DOMAIN,
 )
 from homeassistant.const import UnitOfEnergy, UnitOfPower
@@ -39,12 +39,12 @@ _BATTERY_OPTIONAL_DOMAINS = {CONF_BATTERY_POWER_ENTITY: "sensor"}
 _FORECAST_OPTIONAL_DOMAINS = {
     CONF_FORECAST_REMAINING_ENTITY: "sensor",
     CONF_BATTERY_LEVEL_ENTITY: "sensor",
-    CONF_HOUSE_POWER_ENTITY: "sensor",
+    CONF_SOLAR_POWER_ENTITY: "sensor",
 }
 _EV_FIRST_KEYS = (
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_BATTERY_LEVEL_ENTITY,
-    CONF_HOUSE_POWER_ENTITY,
+    CONF_SOLAR_POWER_ENTITY,
     CONF_BATTERY_CAPACITY_KWH,
 )
 _ENERGY_UNITS = {
@@ -162,7 +162,7 @@ def validate_forecast(
     """Validate the EV-first inputs, which are either all set or all empty."""
     if errors := _validate_entities(hass, user_input, _FORECAST_OPTIONAL_DOMAINS, required=False):
         return errors
-    if errors := _validate_power_units(hass, user_input, (CONF_HOUSE_POWER_ENTITY,)):
+    if errors := _validate_power_units(hass, user_input, (CONF_SOLAR_POWER_ENTITY,)):
         return errors
 
     forecast_entity = user_input.get(CONF_FORECAST_REMAINING_ENTITY)

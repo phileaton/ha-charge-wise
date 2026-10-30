@@ -144,7 +144,7 @@ async def test_options_flow_rejects_a_non_energy_forecast_sensor(
     pages[3] = {
         "forecast_remaining_entity": "sensor.grid_power",
         "battery_level_entity": "sensor.level",
-        "house_power_entity": "sensor.grid_power",
+        "solar_power_entity": "sensor.grid_power",
         "battery_capacity_kwh": 27,
         "battery_target_percent": 90,
         "forecast_trust_percent": 80,
@@ -160,12 +160,12 @@ async def test_options_flow_stores_ev_first_inputs(hass: HomeAssistant, config_e
     config_entry.add_to_hass(hass)
     hass.states.async_set("sensor.forecast", "10", {"unit_of_measurement": "kWh"})
     hass.states.async_set("sensor.level", "50", {"unit_of_measurement": "%"})
-    hass.states.async_set("sensor.house", "400", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.solar", "400", {"unit_of_measurement": "W"})
     pages = _pages(config_entry.options)
     pages[3] = {
         "forecast_remaining_entity": "sensor.forecast",
         "battery_level_entity": "sensor.level",
-        "house_power_entity": "sensor.house",
+        "solar_power_entity": "sensor.solar",
         "battery_capacity_kwh": 27,
         "battery_target_percent": 85,
         "forecast_trust_percent": 70,

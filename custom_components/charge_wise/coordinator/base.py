@@ -27,11 +27,11 @@ from custom_components.charge_wise.const import (
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
     CONF_HOUSE_LOAD_WINDOW_DAYS,
-    CONF_HOUSE_POWER_ENTITY,
     CONF_LOW_SOLAR_CONFIRMATION_S,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
     CONF_OFFPEAK_WINDOWS,
+    CONF_SOLAR_POWER_ENTITY,
     CONF_SOLAR_START_W,
     CONF_VOLTAGE_V,
     DEFAULT_BATTERY_CONFIRMATION_S,
@@ -184,7 +184,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 CONF_EV_CONNECTED_ENTITY,
                 CONF_FORECAST_REMAINING_ENTITY,
                 CONF_BATTERY_LEVEL_ENTITY,
-                CONF_HOUSE_POWER_ENTITY,
+                CONF_SOLAR_POWER_ENTITY,
             )
             if self.options.get(key)
         }
@@ -327,21 +327,32 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Feed the current house power into the learned consumption profile."""
         if self.ev_first_config is None:
             return
-        self.house_load.observe(self._power_w(self.options.get(CONF_HOUSE_POWER_ENTITY)), dt_util.as_local(now))
+        self.house_load.observe(self._house_power_w(), dt_util.as_local(now))
         self._house_load_store.async_delay_save(self.house_load.as_dict, _HOUSE_LOAD_SAVE_DELAY_S)
+
+    def _battery_discharge_w(self) -> float | None:
+        """Return battery power with discharge positive, whatever sign the sensor uses."""
+        power = self._power_w(self.options.get(CONF_BATTERY_POWER_ENTITY))
+        if (
+            power is not None
+            and self.options.get(CONF_BATTERY_DISCHARGE_SIGN, DEFAULT_BATTERY_DISCHARGE_SIGN) == BATTERY_SIGN_NEGATIVE
+        ):
+            return -power
+        return power
+
+    def _house_power_w(self) -> float | None:
+        """Return house consumption excluding the EV: production + grid import + battery discharge - charger."""
+        production = self._power_w(self.options.get(CONF_SOLAR_POWER_ENTITY))
+        grid = self._power_w(self.options[CONF_GRID_POWER_ENTITY])
+        charger = self._power_w(self.options[CONF_CHARGER_POWER_ENTITY])
+        battery = self._battery_discharge_w() if self.battery_configured else 0.0
+        if production is None or grid is None or charger is None or battery is None:
+            return None
+        return max(0.0, production + grid + battery - charger)
 
     def _read_inputs(self, *, ev_first_active: bool = False) -> ControllerInput:
         """Read and normalize the currently configured Home Assistant entities."""
-        battery_power = self._power_w(self.options.get(CONF_BATTERY_POWER_ENTITY))
-        if (
-            battery_power is not None
-            and self.options.get(
-                CONF_BATTERY_DISCHARGE_SIGN,
-                DEFAULT_BATTERY_DISCHARGE_SIGN,
-            )
-            == BATTERY_SIGN_NEGATIVE
-        ):
-            battery_power = -battery_power
+        battery_power = self._battery_discharge_w()
 
         ev_connected: bool | None = None
         ev_entity = self.options.get(CONF_EV_CONNECTED_ENTITY)
@@ -373,7 +384,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         keys = (
             CONF_FORECAST_REMAINING_ENTITY,
             CONF_BATTERY_LEVEL_ENTITY,
-            CONF_HOUSE_POWER_ENTITY,
+            CONF_SOLAR_POWER_ENTITY,
             CONF_BATTERY_CAPACITY_KWH,
         )
         if not all(self.options.get(key) for key in keys):
@@ -391,7 +402,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         sun_state = self.hass.states.get("sun.sun")
         hours_until_sunset: float | None = None
         house_use_kwh: float | None = None
-        instant_w = self._power_w(self.options.get(CONF_HOUSE_POWER_ENTITY))
+        instant_w = self._house_power_w()
         if sun_state is not None and sun_state.state == "above_horizon":
             setting = dt_util.parse_datetime(str(sun_state.attributes.get("next_setting", "")))
             if setting is not None:
