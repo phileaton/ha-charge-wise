@@ -34,13 +34,15 @@
           "solar_start_w": "Solar start threshold",
           "low_solar_confirmation_s": "Low-solar confirmation time",
           "cooldown_s": "Restart cooldown",
-          "current_deadband_a": "Current adjustment deadband"
+          "current_deadband_a": "Current adjustment deadband",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "solar_start_w": "Minimum available solar power required to start charging.",
           "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
           "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
-          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
       "battery": {
@@ -52,7 +54,8 @@
           "battery_discharge_w": "Battery discharge threshold",
           "battery_recovery_w": "Battery recovery threshold",
           "battery_confirmation_s": "Battery protection confirmation time",
-          "battery_recovery_confirmation_s": "Battery recovery confirmation time"
+          "battery_recovery_confirmation_s": "Battery recovery confirmation time",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
@@ -60,7 +63,8 @@
           "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
           "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
           "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
-          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears."
+          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
       "forecast": {
@@ -72,7 +76,8 @@
           "house_power_entity": "Average house consumption",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
-          "forecast_trust_percent": "Forecast trust (%)"
+          "forecast_trust_percent": "Forecast trust (%)",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
@@ -80,7 +85,8 @@
           "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
+          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
       "offpeak": {
@@ -95,7 +101,8 @@
           "offpeak_window_2_days": "Off-peak window 2 days",
           "offpeak_window_3_start": "Off-peak window 3 start",
           "offpeak_window_3_end": "Off-peak window 3 end",
-          "offpeak_window_3_days": "Off-peak window 3 days"
+          "offpeak_window_3_days": "Off-peak window 3 days",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "offpeak_window_1_start": "Leave start and end empty to skip this window.",
@@ -106,7 +113,8 @@
           "offpeak_window_2_days": "Optional.",
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
-          "offpeak_window_3_days": "Optional."
+          "offpeak_window_3_days": "Optional.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       }
     },
@@ -163,13 +171,15 @@
           "solar_start_w": "Solar start threshold",
           "low_solar_confirmation_s": "Low-solar confirmation time",
           "cooldown_s": "Restart cooldown",
-          "current_deadband_a": "Current adjustment deadband"
+          "current_deadband_a": "Current adjustment deadband",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "solar_start_w": "Minimum available solar power required to start charging.",
           "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
           "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
-          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands."
+          "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
       "battery": {
@@ -181,7 +191,8 @@
           "battery_discharge_w": "Battery discharge threshold",
           "battery_recovery_w": "Battery recovery threshold",
           "battery_confirmation_s": "Battery protection confirmation time",
-          "battery_recovery_confirmation_s": "Battery recovery confirmation time"
+          "battery_recovery_confirmation_s": "Battery recovery confirmation time",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "battery_power_entity": "Optional battery power sensor. Omitting it disables battery-discharge protection.",
@@ -189,7 +200,8 @@
           "battery_discharge_w": "Battery discharge above this level starts the protection confirmation timer.",
           "battery_recovery_w": "Battery discharge must remain below this level before protection can clear.",
           "battery_confirmation_s": "How long battery discharge must exceed its threshold before protection activates.",
-          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears."
+          "battery_recovery_confirmation_s": "How long battery discharge must remain below its recovery threshold before protection clears.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
       "forecast": {
@@ -201,7 +213,8 @@
           "house_power_entity": "Average house consumption",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
-          "forecast_trust_percent": "Forecast trust (%)"
+          "forecast_trust_percent": "Forecast trust (%)",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
@@ -209,7 +222,8 @@
           "house_power_entity": "Optional average house consumption sensor (mW, W or kW), excluding the EV charger.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious."
+          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
       "offpeak": {
@@ -224,7 +238,8 @@
           "offpeak_window_2_days": "Off-peak window 2 days",
           "offpeak_window_3_start": "Off-peak window 3 start",
           "offpeak_window_3_end": "Off-peak window 3 end",
-          "offpeak_window_3_days": "Off-peak window 3 days"
+          "offpeak_window_3_days": "Off-peak window 3 days",
+          "go_back": "Go back to the previous page"
         },
         "data_description": {
           "offpeak_window_1_start": "Leave start and end empty to skip this window.",
@@ -235,7 +250,8 @@
           "offpeak_window_2_days": "Optional.",
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
-          "offpeak_window_3_days": "Optional."
+          "offpeak_window_3_days": "Optional.",
+          "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       }
     },

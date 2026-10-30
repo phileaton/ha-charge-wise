@@ -9,6 +9,9 @@ from custom_components.charge_wise.config_flow_handler.schemas import PAGE_SCHEM
 from custom_components.charge_wise.config_flow_handler.schemas.windows import form_to_options, windows_to_form
 from custom_components.charge_wise.config_flow_handler.validators.configuration import PAGE_VALIDATORS
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import selector
+
+BACK_KEY = "go_back"
 
 
 class PagedForm:
@@ -41,9 +44,20 @@ class PagedForm:
         index = PAGES.index(page) + 1
         return PAGES[index] if index < len(PAGES) else None
 
+    @staticmethod
+    def previous_page(page: str) -> str | None:
+        """Return the page before this one, or None on the first."""
+        index = PAGES.index(page) - 1
+        return PAGES[index] if index >= 0 else None
+
     def schema(self, page: str) -> probatio.Schema:
-        """Build the schema of a page, defaulting numbers to what is stored or already entered."""
-        return PAGE_SCHEMAS[page]({**self._stored, **self.values})
+        """Build the schema of a page, with a trailing go-back toggle on every page but the first."""
+        schema = PAGE_SCHEMAS[page]({**self._stored, **self.values})
+        if self.previous_page(page) is None:
+            return schema
+        return probatio.Schema(
+            {**schema.schema, probatio.Optional(BACK_KEY, default=False): selector.BooleanSelector()},
+        )
 
     def suggested(self, schema: probatio.Schema, user_input: dict[str, Any] | None) -> dict[str, Any]:
         """Return the values to prefill, preferring what the user just typed over what is stored."""

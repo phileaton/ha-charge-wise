@@ -209,3 +209,34 @@ async def test_incomplete_offpeak_window_is_rejected(hass: HomeAssistant, config
 
     assert result["step_id"] == "offpeak"
     assert result["errors"] == {"base": "offpeak_window_incomplete"}
+
+
+async def test_pages_offer_next_then_submit_and_go_back(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
+    """Only the last page is a final step, and going back returns to the previous page with values kept."""
+    pages = _pages(config_entry.options)
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    assert "go_back" not in {str(key) for key in result["data_schema"].schema}
+    assert result["last_step"] is False
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=pages[0])
+    assert result["step_id"] == "solar"
+    assert "go_back" in {str(key) for key in result["data_schema"].schema}
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={**pages[1], "solar_start_w": 1500, "go_back": True},
+    )
+    assert result["step_id"] == "user"
+    assert result["errors"] == {}
+    keys = {str(marker): marker for marker in result["data_schema"].schema}
+    assert keys["grid_power_entity"].description["suggested_value"] == "sensor.grid_power"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=pages[0])
+    keys = {str(marker): marker for marker in result["data_schema"].schema}
+    assert result["step_id"] == "solar"
+    assert keys["solar_start_w"].default() == 1500
+
+    for page_input in pages[1:4]:
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=page_input)
+    assert result["step_id"] == "offpeak"
+    assert result["last_step"] is True

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from custom_components.charge_wise.config_flow_handler.paged_form import PagedForm
+from custom_components.charge_wise.config_flow_handler.paged_form import BACK_KEY, PagedForm
 from homeassistant import config_entries
 
 
@@ -24,19 +24,26 @@ class ChargeWiseOptionsFlow(config_entries.OptionsFlow):
         form = self._paged_form()
         errors: dict[str, str] = {}
         if user_input is not None:
+            user_input = dict(user_input)
+            go_back = user_input.pop(BACK_KEY, False)
+            previous_page = form.previous_page(page)
+            if go_back and previous_page is not None:
+                form.accept(user_input)
+                return await self._async_page(previous_page, None)
             errors = form.validate(page, user_input)
             if not errors:
                 form.accept(user_input)
                 next_page = form.next_page(page)
                 if next_page is None:
                     return self.async_create_entry(title="", data=form.options())
-                return await getattr(self, f"async_step_{next_page}")()
+                return await self._async_page(next_page, None)
 
         schema = form.schema(page)
         return self.async_show_form(
             step_id="init" if page == "charger" else page,
             data_schema=self.add_suggested_values_to_schema(schema, form.suggested(schema, user_input)),
             errors=errors,
+            last_step=form.next_page(page) is None,
         )
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
