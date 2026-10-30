@@ -177,6 +177,13 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self.controller.start_cooldown(dt_util.utcnow())
         await self._async_evaluate()
 
+    @property
+    def maximum_current_a(self) -> float:
+        """Return the configured maximum, lowered to the live hardware maximum when available."""
+        maximum = float(self.controller.config.maximum_current_a)
+        hardware_a = self._number_value(self.options.get(CONF_HARDWARE_MAXIMUM_ENTITY))
+        return maximum if hardware_a is None else min(maximum, hardware_a)
+
     async def async_set_manual_current(self, current_a: float) -> None:
         """Store a manual target and immediately re-evaluate."""
         self.manual_current_a = current_a

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.charge_wise.const import (
@@ -13,6 +14,7 @@ from custom_components.charge_wise.const import (
 )
 from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
 
@@ -61,6 +63,26 @@ async def test_setup_exposes_the_charge_wise_control_surface(
     assert float(hass.states.get(current_entity).state) == 0
     assert hass.states.get(reason_entity).state == "off"
     assert hass.states.get(battery_entity).state == "off"
+
+
+async def test_current_numbers_are_bounded_by_the_live_hardware_maximum(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """A lower hardware maximum lowers the selectable range of both current numbers."""
+    hass.states.async_set("number.hardware_maximum", "16", {"unit_of_measurement": UnitOfElectricCurrent.AMPERE})
+    await hass.async_block_till_done()
+
+    for key in ("manual_current", "offpeak_current"):
+        entity_id = _entity_id(hass, init_integration, "number", key)
+        assert float(hass.states.get(entity_id).attributes["max"]) == 16
+        with pytest.raises(ServiceValidationError):
+            await hass.services.async_call(
+                "number",
+                "set_value",
+                {"entity_id": entity_id, "value": 20},
+                blocking=True,
+            )
 
 
 async def test_solar_budget_uses_charger_power_and_signed_grid_power(

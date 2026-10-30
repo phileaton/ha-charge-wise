@@ -36,8 +36,8 @@ class ChargeWiseManualCurrentNumber(NumberEntity, RestoreEntity, ChargeWiseEntit
 
     @property
     def native_max_value(self) -> float:
-        """Return the configured maximum current."""
-        return float(self.coordinator.controller.config.maximum_current_a)
+        """Return the configured maximum, lowered to the live hardware maximum."""
+        return self.coordinator.maximum_current_a
 
     async def async_added_to_hass(self) -> None:
         """Restore the prior target after Home Assistant restarts."""
