@@ -3,21 +3,27 @@ views:
     path: charge-wise
     cards:
       - type: entities
-        title: Garage Charger
+        title: Garage Charger controls
         show_header_toggle: false
         entities:
           - entity: switch.garage_charger_charging_enabled
           - entity: switch.garage_charger_solar_charging
+          - entity: switch.garage_charger_ev_first_charging
           - entity: switch.garage_charger_off_peak_charging
           - entity: switch.garage_charger_manual_override
           - entity: number.garage_charger_manual_current
           - entity: number.garage_charger_off_peak_current
-          - entity: binary_sensor.garage_charger_off_peak_active
-          - entity: sensor.garage_charger_next_off_peak_window
+      - type: entities
+        title: Garage Charger status
+        entities:
           - entity: sensor.garage_charger_controller_status
+          - entity: sensor.garage_charger_decision_reason
           - entity: sensor.garage_charger_requested_current
           - entity: sensor.garage_charger_available_solar_budget
-          - entity: sensor.garage_charger_decision_reason
+          - entity: binary_sensor.garage_charger_ev_first_active
+          - entity: sensor.garage_charger_average_house_consumption
+          - entity: binary_sensor.garage_charger_off_peak_active
+          - entity: sensor.garage_charger_next_off_peak_window
           - entity: binary_sensor.garage_charger_battery_protection
       - type: history-graph
         title: Charging controller
@@ -25,3 +31,4 @@ views:
         entities:
           - entity: sensor.garage_charger_requested_current
           - entity: sensor.garage_charger_available_solar_budget
+          - entity: sensor.garage_charger_average_house_consumption
