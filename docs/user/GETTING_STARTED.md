@@ -32,8 +32,8 @@ Install Charge Wise through HACS as a custom integration, or copy `custom_compon
 
 ## Add the integration
 
-1. Open Home Assistant's integration setup flow and find **Charge Wise**. It is classified as a calculated helper,
-   not a physical device.
+1. Open Home Assistant's integration setup flow and find **Charge Wise**. It is a service that controls
+   your charger from other entities, not a physical device.
 2. Select **Charge Wise**.
 3. Select the grid-power sensor, charger-power sensor, charger switch, and writable current target.
 4. Enter a safe maximum current and review the operating limits and Solar defaults.
