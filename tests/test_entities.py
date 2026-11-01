@@ -3,7 +3,7 @@
 from typing import Any
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, mock_restore_cache
 
 from custom_components.charge_wise.const import (
     CONF_BATTERY_POWER_ENTITY,
@@ -13,7 +13,7 @@ from custom_components.charge_wise.const import (
     DOMAIN,
 )
 from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
@@ -54,10 +54,10 @@ async def test_setup_exposes_the_charge_wise_control_surface(
     battery_entity = _entity_id(hass, init_integration, "binary_sensor", "battery_protection")
 
     assert all(hass.states.get(entity_id).state == "off" for entity_id in switch_entities)
-    assert float(hass.states.get(offpeak_number).state) == 6
+    assert float(hass.states.get(offpeak_number).state) == 32
     assert hass.states.get(next_window).state == "unknown"
     assert hass.states.get(offpeak_active).state == "off"
-    assert float(hass.states.get(number_entity).state) == 6
+    assert float(hass.states.get(number_entity).state) == 32
     assert hass.states.get(status_entity).state == "off"
     assert hass.states.get(solar_entity).state == "unknown"
     assert float(hass.states.get(current_entity).state) == 0
@@ -190,3 +190,24 @@ async def test_stale_mode_select_entity_is_removed_on_setup(
     await hass.async_block_till_done()
 
     assert registry.async_get_entity_id("select", DOMAIN, f"{config_entry.entry_id}_mode") is None
+
+
+async def test_current_numbers_keep_their_prior_value_across_restarts(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """The charger maximum is only the first-install default; a restored value wins."""
+    entity_ids = {
+        key: _entity_id(hass, init_integration, "number", key) for key in ("manual_current", "offpeak_current")
+    }
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
+    mock_restore_cache(
+        hass,
+        [State(entity_ids["manual_current"], "10"), State(entity_ids["offpeak_current"], "12")],
+    )
+
+    assert await hass.config_entries.async_setup(init_integration.entry_id)
+    await hass.async_block_till_done()
+
+    assert float(hass.states.get(entity_ids["manual_current"]).state) == 10
+    assert float(hass.states.get(entity_ids["offpeak_current"]).state) == 12

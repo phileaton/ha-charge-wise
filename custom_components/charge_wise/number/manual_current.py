@@ -40,9 +40,10 @@ class ChargeWiseManualCurrentNumber(NumberEntity, RestoreEntity, ChargeWiseEntit
         return self.coordinator.maximum_current_a
 
     async def async_added_to_hass(self) -> None:
-        """Restore the prior target after Home Assistant restarts."""
+        """Restore the prior target, or start at the charger maximum on first install."""
         await super().async_added_to_hass()
         if (last_state := await self.async_get_last_state()) is None:
+            await self.coordinator.async_set_manual_current(self.native_max_value)
             return
         try:
             current_a = float(last_state.state)

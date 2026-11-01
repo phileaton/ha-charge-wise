@@ -110,7 +110,8 @@ protection binary sensor is created only when a battery-power entity is configur
 Each entry creates:
 
 - **Charging enabled**, **Solar charging**, **Off-peak charging**, **Manual override** and **EV-first charging** switches.
-- **Manual current** and **Off-peak current** numbers.
+- **Manual current** and **Off-peak current** numbers. On first install both start at the charger maximum; after that
+  they keep their last value across restarts.
 - **Controller status** sensor with the stable states Off, Waiting, Charging, Paused, and Error.
 - **Available solar budget**, **Requested current**, and **Decision reason** sensors.
 - **Next off-peak window** timestamp sensor.
