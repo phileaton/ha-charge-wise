@@ -149,6 +149,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             smoothing_window_s=int(self.options.get(CONF_SMOOTHING_WINDOW_S, DEFAULT_SMOOTHING_WINDOW_S)),
         )
         self.controller = ChargeWiseController(self._config)
+        self._last_logged_decision: tuple[bool, ChargeWiseReason, float] | None = None
 
         super().__init__(
             hass,
@@ -274,7 +275,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             offpeak_next_change=next_change(self.windows, local_now),
         )
         ev_first_active = self._ev_first_active(now)
-        decision = self.controller.evaluate(settings, self._read_inputs(ev_first_active=ev_first_active), now)
+        readings = self._read_inputs(ev_first_active=ev_first_active)
+        decision = self.controller.evaluate(settings, readings, now)
+        self._log_decision_change(decision, readings)
         next_start_at = next_start(self.windows, local_now) if self.switches["offpeak_enabled"] else None
         try:
             await self._async_apply_decision(decision)
@@ -488,6 +491,28 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Return whether the selected charger switch currently reports on."""
         state = self.hass.states.get(entity_id)
         return state is not None and state.state == STATE_ON
+
+    def _log_decision_change(self, decision: ControllerDecision, readings: ControllerInput) -> None:
+        """Log, at debug level, each change of charger state, reason or requested current."""
+        key = (decision.charger_enabled, decision.reason, decision.requested_current_a)
+        if key == self._last_logged_decision:
+            return
+        self._last_logged_decision = key
+        LOGGER.debug(
+            "Decision: enabled=%s status=%s reason=%s request=%.1fA available=%s W grid=%s W "
+            "charger=%s W battery_discharge=%s W charger_on=%s current=%s A next_update=%s",
+            decision.charger_enabled,
+            decision.status,
+            decision.reason,
+            decision.requested_current_a,
+            decision.available_solar_w,
+            readings.grid_power_w,
+            readings.charger_power_w,
+            readings.battery_discharge_w,
+            readings.charger_enabled,
+            readings.current_target_a,
+            decision.next_update_at,
+        )
 
     async def _async_apply_decision(self, decision: ControllerDecision) -> None:
         """Apply current limit before enabling the charger; stop immediately when unsafe."""
