@@ -6,6 +6,7 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_DISCHARGE_SIGN,
     CONF_CHARGER_POWER_ENTITY,
     CONF_CHARGER_SWITCH_ENTITY,
+    CONF_CREATE_DASHBOARD,
     CONF_CURRENT_TARGET_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
@@ -13,6 +14,7 @@ from custom_components.charge_wise.const import (
 )
 from custom_components.charge_wise.coordinator import ChargeWiseDataUpdateCoordinator
 from custom_components.charge_wise.data import ChargeWiseData
+from custom_components.charge_wise.utils.dashboard import async_ensure_dashboard, async_remove_dashboard
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -60,6 +62,10 @@ async def async_setup_entry(
     await coordinator.async_start()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if entry.options.get(CONF_CREATE_DASHBOARD, False):
+        await async_ensure_dashboard(hass, entry)
+    else:
+        await async_remove_dashboard(hass, entry)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
 
@@ -78,3 +84,11 @@ async def async_reload_entry(
 ) -> None:
     """Reload the integration after its options change."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_remove_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> None:
+    """Remove the dashboard Charge Wise created for a deleted entry."""
+    await async_remove_dashboard(hass, entry)

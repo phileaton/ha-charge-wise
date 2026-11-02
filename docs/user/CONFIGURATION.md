@@ -4,7 +4,7 @@ Charge Wise uses selected Home Assistant entities as inputs and controls one cha
 entity mappings and controller limits later through the integration's **Configure** screen.
 
 Setup and **Configure** both walk five pages: **Charger** (entities and current limits), **Solar charging**,
-**Battery protection**, **EV-first charging** and **Off-peak windows**. The last page saves everything; nothing is
+**Battery protection**, **EV-first charging** and **Off-peak windows** (with the dashboard option). The last page saves everything; nothing is
 stored if you close the dialog earlier. Pages with optional features can be submitted as they are. Home Assistant
 forms have no Back button, so pages 2 to 5 end with a **Go back to the previous page** toggle: tick it and select
 **Next** (or **Submit** on the last page) to return without validating the page. Its values are kept.

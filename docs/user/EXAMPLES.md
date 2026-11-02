@@ -46,7 +46,14 @@ Charge Wise does not compare tariffs or electricity prices; the windows are fixe
 
 ## Dashboard
 
-An importable dashboard using standard Home Assistant cards is in [charge_wise_dashboard.yaml](./charge_wise_dashboard.yaml).
+The last setup page has a **Create a dashboard** option, on by default. It adds a sidebar dashboard named after your
+charger, built from standard Home Assistant cards and your real entities. Charge Wise refreshes it each time the
+integration loads, so edits you make to it are overwritten; copy it into a dashboard of your own to customise it.
+Untick the option in the integration's options, or delete the integration, to remove the dashboard.
+
+Entries set up before this option existed do not get a dashboard until you tick it in their options.
+
+If you prefer to build your own, an importable dashboard is in [charge_wise_dashboard.yaml](./charge_wise_dashboard.yaml).
 Update its sample entity IDs after adding the integration. Remove the battery-protection entity if you did not
 configure a battery sensor, and the EV-first and average house consumption entities if you did not configure the
 forecast page.

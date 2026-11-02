@@ -92,7 +92,7 @@
         }
       },
       "offpeak": {
-        "title": "Off-peak windows",
+        "title": "Off-peak windows and dashboard",
         "description": "Set up to three windows when Off-peak charging may use the grid. Leave start and end empty to skip a window.",
         "data": {
           "offpeak_window_1_start": "Off-peak window 1 start",
@@ -104,6 +104,7 @@
           "offpeak_window_3_start": "Off-peak window 3 start",
           "offpeak_window_3_end": "Off-peak window 3 end",
           "offpeak_window_3_days": "Off-peak window 3 days",
+          "create_dashboard": "Create a dashboard",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
@@ -116,6 +117,7 @@
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
           "offpeak_window_3_days": "Optional.",
+          "create_dashboard": "Adds a Charge Wise dashboard to the sidebar with this charger's controls and status. Untick to remove it.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       }
@@ -231,7 +233,7 @@
         }
       },
       "offpeak": {
-        "title": "Off-peak windows",
+        "title": "Off-peak windows and dashboard",
         "description": "Set up to three windows when Off-peak charging may use the grid. Leave start and end empty to skip a window.",
         "data": {
           "offpeak_window_1_start": "Off-peak window 1 start",
@@ -243,6 +245,7 @@
           "offpeak_window_3_start": "Off-peak window 3 start",
           "offpeak_window_3_end": "Off-peak window 3 end",
           "offpeak_window_3_days": "Off-peak window 3 days",
+          "create_dashboard": "Create a dashboard",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
@@ -255,6 +258,7 @@
           "offpeak_window_3_start": "Optional. Leave start and end empty to skip this window.",
           "offpeak_window_3_end": "Optional.",
           "offpeak_window_3_days": "Optional.",
+          "create_dashboard": "Adds a Charge Wise dashboard to the sidebar with this charger's controls and status. Untick to remove it.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       }

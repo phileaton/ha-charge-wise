@@ -34,6 +34,7 @@ CONF_BATTERY_CAPACITY_KWH = "battery_capacity_kwh"
 CONF_BATTERY_TARGET_PERCENT = "battery_target_percent"
 CONF_FORECAST_TRUST_PERCENT = "forecast_trust_percent"
 CONF_HOUSE_LOAD_WINDOW_DAYS = "house_load_window_days"
+CONF_CREATE_DASHBOARD = "create_dashboard"
 
 BATTERY_SIGN_POSITIVE = "positive"
 BATTERY_SIGN_NEGATIVE = "negative"

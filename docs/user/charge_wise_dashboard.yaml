@@ -24,7 +24,7 @@ views:
           - entity: sensor.garage_charger_average_house_consumption
           - entity: binary_sensor.garage_charger_off_peak_active
           - entity: sensor.garage_charger_next_off_peak_window
-          - entity: binary_sensor.garage_charger_battery_protection
+          - entity: binary_sensor.garage_charger_battery_protection_active
       - type: history-graph
         title: Charging controller
         hours_to_show: 24

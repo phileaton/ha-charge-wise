@@ -21,6 +21,7 @@ from custom_components.charge_wise.const import (
     CONF_CHARGER_POWER_ENTITY,
     CONF_CHARGER_SWITCH_ENTITY,
     CONF_COOLDOWN_S,
+    CONF_CREATE_DASHBOARD,
     CONF_CURRENT_DEADBAND_A,
     CONF_CURRENT_TARGET_ENTITY,
     CONF_EV_CONNECTED_ENTITY,
@@ -156,10 +157,13 @@ def forecast_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     return probatio.Schema(schema)
 
 
-def offpeak_schema(_defaults: Mapping[str, Any]) -> probatio.Schema:
-    """Build the page with the off-peak windows."""
+def offpeak_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
+    """Build the page with the off-peak windows and the dashboard toggle."""
     schema: Schema = {}
     add_window_fields(schema)
+    schema[probatio.Optional(CONF_CREATE_DASHBOARD, default=defaults.get(CONF_CREATE_DASHBOARD, True))] = (
+        selector.BooleanSelector()
+    )
     return probatio.Schema(schema)
 
 
