@@ -1,7 +1,7 @@
 # Agent Skills
 
 Task-triggered playbooks written against the open [Agent Skills standard](https://agentskills.io/specification), which
-Claude Code, GitHub Copilot, VS Code, OpenAI Codex CLI, Cursor, Gemini CLI and others implement.
+Claude Code, GitHub Copilot, VS Code, OpenAI Codex CLI, OpenCode, Cursor, Gemini CLI and others implement.
 
 For how this directory is discovered, which client reads which path, the placeholder convention, and how to customize
 any of it in your own repository, see [`../README.md`](../README.md). This file is about the skills themselves.
@@ -24,10 +24,21 @@ any of it in your own repository, see [`../README.md`](../README.md). This file 
 | [`ha-release`](ha-release/SKILL.md)                     | cutting a release, commit messages, changelog, release notes              |
 | [`ha-issue-triage`](ha-issue-triage/SKILL.md)           | working through the GitHub issue backlog via branch + PR                  |
 | [`blueprint-tooling`](blueprint-tooling/SKILL.md)       | validation scripts, hook scripts, dependencies, template sync             |
+| [`blueprint-update`](blueprint-update/SKILL.md)         | carrying over blueprint changes the template sync cannot deliver          |
+| [`blueprint-scaffold`](blueprint-scaffold/SKILL.md)     | turning the fresh template into an integration for one real device        |
 | [`blueprint-import`](blueprint-import/SKILL.md)         | migrating an existing custom integration into this repository             |
 
-`blueprint-import` is a one-time skill: it removes itself once its job is done. Leaving it in place costs context in
-every later session.
+`blueprint-scaffold` and `blueprint-import` are one-time skills: each ends with a step that removes itself once its
+job is done. Leaving them in place costs context in every later session.
+
+<!-- blueprint-only:start -->
+
+[`blueprint-skill-maintenance`](blueprint-skill-maintenance/SKILL.md) covers maintaining this shipped set — the
+rule-versus-procedure seam, the catalogue duplication, and what to re-verify after a Home Assistant version bump.
+`initialize.sh` removes it when a project is initialised from the template, because it is only meaningful in the
+blueprint repository itself.
+
+<!-- blueprint-only:end -->
 
 ## Naming
 
