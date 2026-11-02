@@ -89,6 +89,11 @@ input or `sun.sun` is unavailable, Solar charging uses export only. The EV never
 | Battery protection confirmation |     90 s | Time discharge must exceed its threshold before protection activates           |
 | Battery recovery confirmation   |     90 s | Time discharge must stay below its recovery threshold before protection clears |
 | Current adjustment deadband     |      1 A | Smaller target changes are ignored                                             |
+| Settle time after a change      |     30 s | No further Solar current change while the charger catches up (0 = off)         |
+| Solar smoothing window          |     60 s | Averages available solar power so short house loads are ignored (0 = off)      |
+
+The settle time and smoothing window stop the charger hunting up and down when house load changes faster than the
+charger's power reading follows. Battery protection reductions ignore the settle time.
 
 For battery protection, Charge Wise reduces the target by the ceiling of the full measured discharge divided by the
 configured voltage. If the reduced target would be below the minimum operating current, charging stops. The battery

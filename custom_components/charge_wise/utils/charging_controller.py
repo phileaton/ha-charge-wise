@@ -57,6 +57,8 @@ class ControllerConfig:
     battery_confirmation_s: int = 90
     battery_recovery_confirmation_s: int = 90
     current_deadband_a: float = 1.0
+    settle_hold_s: int = 30
+    smoothing_window_s: int = 60
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,8 @@ class ChargeWiseController:
         self._battery_protection_active = False
         self._battery_current_reduction_a = 0
         self._safety_paused = False
+        self._solar_samples: list[tuple[datetime, float]] = []
+        self._hold_until: datetime | None = None
 
     def start_cooldown(self, now: datetime) -> None:
         """Delay a Solar start after a restart so restored switches never cause an immediate start."""
@@ -131,6 +135,8 @@ class ChargeWiseController:
         self._battery_current_reduction_a = 0
         self._safety_paused = False
         self._cooldown_until = None
+        self._solar_samples = []
+        self._hold_until = None
 
     def evaluate(
         self,
@@ -237,6 +243,7 @@ class ChargeWiseController:
             return self._pause(ChargeWiseReason.BATTERY_UNAVAILABLE, readings, now)
 
         available_solar_w = max(0.0, readings.charger_power_w - readings.grid_power_w + readings.ev_first_boost_w)
+        smoothed_solar_w = self._smoothed(available_solar_w, now)
         next_updates = self._update_battery_protection(readings, now)
         low_solar_decision = self._evaluate_low_solar(readings, available_solar_w, now, next_updates)
         if low_solar_decision is not None:
@@ -280,7 +287,7 @@ class ChargeWiseController:
                 now,
             )
 
-        return self._solar_charging_decision(readings, available_solar_w, maximum, next_updates, now)
+        return self._solar_charging_decision(readings, available_solar_w, smoothed_solar_w, maximum, next_updates, now)
 
     def _update_battery_protection(self, readings: ControllerInput, now: datetime) -> list[datetime]:
         """Advance battery confirmation/recovery timers and return their deadlines."""
@@ -383,13 +390,14 @@ class ChargeWiseController:
         self,
         readings: ControllerInput,
         available_solar_w: float,
+        smoothed_solar_w: float,
         maximum: float,
         next_updates: list[datetime],
         now: datetime,
     ) -> ControllerDecision:
-        """Build a bounded solar target and apply the current deadband."""
+        """Build a bounded solar target, applying the deadband and the settle hold."""
         target = min(
-            max(floor(available_solar_w / self.config.voltage_v), self.config.minimum_current_a),
+            max(floor(smoothed_solar_w / self.config.voltage_v), self.config.minimum_current_a),
             maximum,
         )
         if self._battery_protection_active:
@@ -413,6 +421,7 @@ class ChargeWiseController:
         ):
             target = min(max(readings.current_target_a, self.config.minimum_current_a), maximum)
 
+        target = self._apply_settle_hold(readings, target, maximum, next_updates, now)
         reason = self._charging_reason(next_updates, now)
         return self._solar_decision(
             ControllerStatus.CHARGING,
@@ -424,6 +433,56 @@ class ChargeWiseController:
             next_updates,
             now,
         )
+
+    def _apply_settle_hold(
+        self,
+        readings: ControllerInput,
+        target: float,
+        maximum: float,
+        next_updates: list[datetime],
+        now: datetime,
+    ) -> float:
+        """Keep the last current while the charger and its power reading catch up with a change."""
+        if self.config.settle_hold_s <= 0:
+            return target
+        changing = (
+            not readings.charger_enabled or readings.current_target_a is None or target != readings.current_target_a
+        )
+        if not changing:
+            return target
+        if (
+            readings.charger_enabled
+            and readings.current_target_a is not None
+            and not self._battery_protection_active
+            and self._hold_until is not None
+            and now < self._hold_until
+        ):
+            next_updates.append(self._hold_until)
+            return min(max(readings.current_target_a, self.config.minimum_current_a), maximum)
+        self._hold_until = now + timedelta(seconds=self.config.settle_hold_s)
+        return target
+
+    def _smoothed(self, available_solar_w: float, now: datetime) -> float:
+        """Return the time-weighted average of the budget over the smoothing window."""
+        window = self.config.smoothing_window_s
+        if window <= 0:
+            return available_solar_w
+        samples = self._solar_samples
+        if samples and samples[-1][0] == now:
+            samples[-1] = (now, available_solar_w)
+        else:
+            samples.append((now, available_solar_w))
+        start = now - timedelta(seconds=window)
+        while len(samples) > 1 and samples[1][0] <= start:
+            samples.pop(0)
+        total = weighted = 0.0
+        for index, (at, value) in enumerate(samples):
+            until = samples[index + 1][0] if index + 1 < len(samples) else now
+            seconds = (until - max(at, start)).total_seconds()
+            if seconds > 0:
+                total += seconds
+                weighted += value * seconds
+        return weighted / total if total else available_solar_w
 
     def _charging_reason(self, next_updates: list[datetime], now: datetime) -> ChargeWiseReason:
         """Choose the most relevant reason for an active Solar decision."""

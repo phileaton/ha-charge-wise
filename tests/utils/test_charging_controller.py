@@ -341,3 +341,71 @@ def test_ev_first_boost_adds_battery_charge_power_to_the_solar_budget() -> None:
     assert boosted.requested_current_a == 17
     assert boosted.reason is ChargeWiseReason.EV_FIRST
     assert boosted.available_solar_w == 4200
+
+
+def _running(**config: int) -> ChargeWiseController:
+    return ChargeWiseController(ControllerConfig(smoothing_window_s=0, **config))
+
+
+def test_settle_hold_blocks_further_changes_until_the_charger_catches_up() -> None:
+    """A second adjustment inside the hold keeps the current set, then follows once it ends."""
+    controller = _running(settle_hold_s=30)
+    first = controller.evaluate(SOLAR, _readings(grid_power_w=-2400), START)
+    assert first.requested_current_a == 10
+
+    held = controller.evaluate(
+        SOLAR,
+        _readings(charger_enabled=True, current_target_a=10, charger_power_w=0, grid_power_w=-4800),
+        START + timedelta(seconds=10),
+    )
+    assert held.requested_current_a == 10
+    assert held.next_update_at == START + timedelta(seconds=30)
+
+    after = controller.evaluate(
+        SOLAR,
+        _readings(charger_enabled=True, current_target_a=10, charger_power_w=2400, grid_power_w=-2400),
+        START + timedelta(seconds=30),
+    )
+    assert after.requested_current_a == 20
+
+
+def test_settle_hold_does_not_delay_battery_protection() -> None:
+    """Battery protection reductions apply immediately even during the hold."""
+    controller = _running(settle_hold_s=300, battery_confirmation_s=0)
+    controller.evaluate(SOLAR, _readings(grid_power_w=-4800), START)
+    controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True, current_target_a=20, charger_power_w=4800, grid_power_w=0, battery_discharge_w=480
+        ),
+        START + timedelta(seconds=1),
+    )
+    decision = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True, current_target_a=20, charger_power_w=4800, grid_power_w=0, battery_discharge_w=480
+        ),
+        START + timedelta(seconds=2),
+    )
+    assert decision.requested_current_a < 20
+
+
+def test_smoothing_ignores_a_brief_spike_in_house_load() -> None:
+    """A short drop in the budget barely moves the target; a sustained one does."""
+    controller = ChargeWiseController(ControllerConfig(settle_hold_s=0, smoothing_window_s=60))
+    steady = _readings(charger_enabled=True, current_target_a=20, charger_power_w=4800, grid_power_w=0)
+    controller.evaluate(SOLAR, steady, START)
+    controller.evaluate(SOLAR, steady, START + timedelta(seconds=50))
+    spike = controller.evaluate(
+        SOLAR,
+        _readings(charger_enabled=True, current_target_a=20, charger_power_w=4800, grid_power_w=3000),
+        START + timedelta(seconds=55),
+    )
+    assert spike.requested_current_a >= 19
+
+    sustained = controller.evaluate(
+        SOLAR,
+        _readings(charger_enabled=True, current_target_a=20, charger_power_w=4800, grid_power_w=3000),
+        START + timedelta(seconds=200),
+    )
+    assert sustained.requested_current_a == 7

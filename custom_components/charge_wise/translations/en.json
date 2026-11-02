@@ -35,6 +35,8 @@
           "low_solar_confirmation_s": "Low-solar confirmation time",
           "cooldown_s": "Restart cooldown",
           "current_deadband_a": "Current adjustment deadband",
+          "settle_hold_s": "Settle time after a current change",
+          "smoothing_window_s": "Solar smoothing window",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
@@ -42,6 +44,8 @@
           "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
           "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
           "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "settle_hold_s": "After changing the current, wait this long before changing it again so the charger and its power reading catch up. 0 turns it off.",
+          "smoothing_window_s": "Average the available solar power over this window so brief house loads do not move the charger. 0 turns it off.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
@@ -176,6 +180,8 @@
           "low_solar_confirmation_s": "Low-solar confirmation time",
           "cooldown_s": "Restart cooldown",
           "current_deadband_a": "Current adjustment deadband",
+          "settle_hold_s": "Settle time after a current change",
+          "smoothing_window_s": "Solar smoothing window",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
@@ -183,6 +189,8 @@
           "low_solar_confirmation_s": "How long available solar power may remain below the minimum before charging stops.",
           "cooldown_s": "Minimum wait after stopping or restoring a mode before Solar can restart.",
           "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
+          "settle_hold_s": "After changing the current, wait this long before changing it again so the charger and its power reading catch up. 0 turns it off.",
+          "smoothing_window_s": "Average the available solar power over this window so brief house loads do not move the charger. 0 turns it off.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },

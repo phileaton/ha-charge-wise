@@ -33,6 +33,8 @@ from custom_components.charge_wise.const import (
     CONF_LOW_SOLAR_CONFIRMATION_S,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
+    CONF_SETTLE_HOLD_S,
+    CONF_SMOOTHING_WINDOW_S,
     CONF_SOLAR_POWER_ENTITY,
     CONF_SOLAR_START_W,
     CONF_VOLTAGE_V,
@@ -48,6 +50,8 @@ from custom_components.charge_wise.const import (
     DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
+    DEFAULT_SETTLE_HOLD_S,
+    DEFAULT_SMOOTHING_WINDOW_S,
     DEFAULT_SOLAR_START_W,
     DEFAULT_VOLTAGE_V,
 )
@@ -93,6 +97,8 @@ def solar_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     )
     _add_number_field(schema, defaults, CONF_COOLDOWN_S, DEFAULT_COOLDOWN_S, 0, 3600, 1, "s")
     _add_number_field(schema, defaults, CONF_CURRENT_DEADBAND_A, DEFAULT_CURRENT_DEADBAND_A, 0, 10, 0.5, "A")
+    _add_number_field(schema, defaults, CONF_SETTLE_HOLD_S, DEFAULT_SETTLE_HOLD_S, 0, 300, 5, "s")
+    _add_number_field(schema, defaults, CONF_SMOOTHING_WINDOW_S, DEFAULT_SMOOTHING_WINDOW_S, 0, 600, 5, "s")
     return probatio.Schema(schema)
 
 

@@ -19,7 +19,14 @@ _CHARGER_KEYS = {
     "maximum_current_a",
     "voltage_v",
 }
-_SOLAR_KEYS = {"solar_start_w", "low_solar_confirmation_s", "cooldown_s", "current_deadband_a"}
+_SOLAR_KEYS = {
+    "solar_start_w",
+    "low_solar_confirmation_s",
+    "cooldown_s",
+    "current_deadband_a",
+    "settle_hold_s",
+    "smoothing_window_s",
+}
 _BATTERY_KEYS = {
     "battery_power_entity",
     "battery_discharge_sign",

@@ -31,6 +31,8 @@ from custom_components.charge_wise.const import (
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
     CONF_OFFPEAK_WINDOWS,
+    CONF_SETTLE_HOLD_S,
+    CONF_SMOOTHING_WINDOW_S,
     CONF_SOLAR_POWER_ENTITY,
     CONF_SOLAR_START_W,
     CONF_VOLTAGE_V,
@@ -46,6 +48,8 @@ from custom_components.charge_wise.const import (
     DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
+    DEFAULT_SETTLE_HOLD_S,
+    DEFAULT_SMOOTHING_WINDOW_S,
     DEFAULT_SOLAR_START_W,
     DEFAULT_VOLTAGE_V,
     DOMAIN,
@@ -141,6 +145,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             current_deadband_a=float(
                 self.options.get(CONF_CURRENT_DEADBAND_A, DEFAULT_CURRENT_DEADBAND_A),
             ),
+            settle_hold_s=int(self.options.get(CONF_SETTLE_HOLD_S, DEFAULT_SETTLE_HOLD_S)),
+            smoothing_window_s=int(self.options.get(CONF_SMOOTHING_WINDOW_S, DEFAULT_SMOOTHING_WINDOW_S)),
         )
         self.controller = ChargeWiseController(self._config)
 
