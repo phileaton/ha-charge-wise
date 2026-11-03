@@ -76,10 +76,10 @@
         "description": "Optionally let the EV use power that would charge the home battery when the solar forecast covers the battery's need. Set the four inputs together or leave them empty.",
         "data": {
           "forecast_remaining_entity": "Solar forecast remaining today",
+          "forecast_today_entity": "Solar forecast total today",
           "battery_level_entity": "Battery level",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
-          "forecast_trust_percent": "Forecast trust (%)",
           "ev_first_release_margin_percent": "EV-first release margin (%)",
           "house_load_window_days": "House consumption learning window (days)",
           "solar_power_entity": "Solar production power",
@@ -87,10 +87,10 @@
         },
         "data_description": {
           "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
+          "forecast_today_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast for the whole of today. With it, Charge Wise compares the forecast so far with the solar energy actually produced and scales the rest of the day's forecast by that accuracy. Without it the forecast is used as given.",
           "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious.",
           "ev_first_release_margin_percent": "Once EV-first is active, it stays active until the forecast surplus falls this far below the battery's need. Prevents flapping near the threshold. 0 disables the margin.",
           "house_load_window_days": "How many days of history the learned consumption averages follow. Shorter adapts faster.",
           "solar_power_entity": "Optional sensor (mW, W or kW) with the current solar production. Charge Wise subtracts export and battery charging and adds the grid and battery power it already reads to work out house consumption, then learns the average per hour of day.",
@@ -223,10 +223,10 @@
         "description": "Optionally let the EV use power that would charge the home battery when the solar forecast covers the battery's need. Set the four inputs together or leave them empty.",
         "data": {
           "forecast_remaining_entity": "Solar forecast remaining today",
+          "forecast_today_entity": "Solar forecast total today",
           "battery_level_entity": "Battery level",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
-          "forecast_trust_percent": "Forecast trust (%)",
           "ev_first_release_margin_percent": "EV-first release margin (%)",
           "house_load_window_days": "House consumption learning window (days)",
           "solar_power_entity": "Solar production power",
@@ -234,10 +234,10 @@
         },
         "data_description": {
           "forecast_remaining_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast solar energy still to come today, such as Forecast.Solar.",
+          "forecast_today_entity": "Optional energy sensor (Wh, kWh or MWh) with the forecast for the whole of today. With it, Charge Wise compares the forecast so far with the solar energy actually produced and scales the rest of the day's forecast by that accuracy. Without it the forecast is used as given.",
           "battery_level_entity": "Optional sensor reporting the home battery charge in percent.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "forecast_trust_percent": "Share of the forecast counted on. Lower values are more cautious.",
           "ev_first_release_margin_percent": "Once EV-first is active, it stays active until the forecast surplus falls this far below the battery's need. Prevents flapping near the threshold. 0 disables the margin.",
           "house_load_window_days": "How many days of history the learned consumption averages follow. Shorter adapts faster.",
           "solar_power_entity": "Optional sensor (mW, W or kW) with the current solar production. Charge Wise subtracts export and battery charging and adds the grid and battery power it already reads to work out house consumption, then learns the average per hour of day.",
@@ -367,6 +367,9 @@
       },
       "forecast_surplus": {
         "name": "Forecast surplus after house use"
+      },
+      "forecast_accuracy": {
+        "name": "Forecast accuracy"
       }
     },
     "binary_sensor": {

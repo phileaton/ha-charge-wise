@@ -24,7 +24,7 @@ from custom_components.charge_wise.const import (
     CONF_EV_CONNECTED_ENTITY,
     CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
     CONF_FORECAST_REMAINING_ENTITY,
-    CONF_FORECAST_TRUST_PERCENT,
+    CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
     CONF_HOUSE_LOAD_WINDOW_DAYS,
@@ -46,7 +46,6 @@ from custom_components.charge_wise.const import (
     DEFAULT_COOLDOWN_S,
     DEFAULT_CURRENT_DEADBAND_A,
     DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
-    DEFAULT_FORECAST_TRUST_PERCENT,
     DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
@@ -68,6 +67,7 @@ from custom_components.charge_wise.utils.charging_controller import (
     ControlSettings,
 )
 from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstInputs, EvFirstResult, evaluate_ev_first
+from custom_components.charge_wise.utils.forecast_accuracy import ForecastAccuracy
 from custom_components.charge_wise.utils.house_load import HouseLoadProfile
 from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower
@@ -121,6 +121,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self.ev_first_config = self._ev_first_config_from_options()
         self._ev_first_was_active = False
         self._ev_first_energy_kwh = 0.0
+        self.forecast_accuracy = ForecastAccuracy()
         self._ev_first_last_at: datetime | None = None
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
@@ -206,7 +207,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         if self.ev_first_config is not None:
             entity_ids.add("sun.sun")
             self.house_load.restore(await self._house_load_store.async_load())
-            self._restore_ev_first(await self._ev_first_store.async_load())
+            stored = await self._ev_first_store.async_load()
+            self._restore_ev_first(stored)
+            self.forecast_accuracy.restore((stored or {}).get("accuracy"), dt_util.now().date())
         self._state_unsub = async_track_state_change_event(
             self.hass,
             entity_ids,
@@ -230,6 +233,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             "date": dt_util.now().date().isoformat(),
             "was_active": self._ev_first_was_active,
             "energy_kwh": self._ev_first_energy_kwh,
+            "accuracy": self.forecast_accuracy.as_dict(),
         }
 
     def _restore_ev_first(self, data: dict[str, Any] | None) -> None:
@@ -310,6 +314,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             offpeak_next_change=next_change(self.windows, local_now),
         )
         self._accumulate_ev_first_energy(now)
+        self._observe_forecast_accuracy(now)
         ev_first_result = self._ev_first_result(now)
         ev_first_active = self._ev_first_enabled() and ev_first_result is not None and ev_first_result.active
         if self._ev_first_enabled():
@@ -377,7 +382,13 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             house_load_w=self._house_power_w(),
             battery_need_kwh=ev_first_result.battery_need_kwh if ev_first_result else None,
             forecast_surplus_kwh=ev_first_result.forecast_surplus_kwh if ev_first_result else None,
+            forecast_accuracy_percent=self._accuracy_percent(),
         )
+
+    def _accuracy_percent(self) -> float | None:
+        """Return the measured forecast accuracy in percent, or None while it is unknown."""
+        ratio = self.forecast_accuracy.ratio
+        return None if ratio is None else ratio * 100
 
     def _observe_house_load(self, now: datetime) -> None:
         """Feed the current house power into the learned consumption profile."""
@@ -435,6 +446,19 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             ev_first_boost_w=ev_first_boost_w,
         )
 
+    def _observe_forecast_accuracy(self, now: datetime) -> None:
+        """Feed solar production and the forecast so far into the accuracy tracker."""
+        if self.ev_first_config is None:
+            return
+        total = self._energy_kwh(self.options.get(CONF_FORECAST_TODAY_ENTITY))
+        remaining = self._energy_kwh(self.options.get(CONF_FORECAST_REMAINING_ENTITY))
+        forecast_so_far = None if total is None or remaining is None else max(0.0, total - remaining)
+        self.forecast_accuracy.observe(
+            dt_util.as_local(now),
+            self._power_w(self.options.get(CONF_SOLAR_POWER_ENTITY)),
+            forecast_so_far,
+        )
+
     def _accumulate_ev_first_energy(self, now: datetime) -> None:
         """Add the charger energy used since the last evaluation while EV-first was active."""
         last = self._ev_first_last_at
@@ -465,7 +489,6 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         return EvFirstConfig(
             battery_capacity_kwh=float(self.options[CONF_BATTERY_CAPACITY_KWH]),
             battery_target_percent=float(self.options.get(CONF_BATTERY_TARGET_PERCENT, DEFAULT_BATTERY_TARGET_PERCENT)),
-            forecast_trust_percent=float(self.options.get(CONF_FORECAST_TRUST_PERCENT, DEFAULT_FORECAST_TRUST_PERCENT)),
             release_margin_percent=float(
                 self.options.get(CONF_EV_FIRST_RELEASE_MARGIN_PERCENT, DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT),
             ),
@@ -500,6 +523,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 house_use_kwh=house_use_kwh,
                 hours_until_sunset=hours_until_sunset,
                 ev_energy_kwh=self._ev_first_energy_kwh,
+                forecast_accuracy=self.forecast_accuracy.ratio or 1.0,
             ),
         )
 

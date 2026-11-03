@@ -15,6 +15,7 @@ from custom_components.charge_wise.const import (
     CONF_CURRENT_TARGET_ENTITY,
     CONF_EV_CONNECTED_ENTITY,
     CONF_FORECAST_REMAINING_ENTITY,
+    CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
@@ -38,6 +39,7 @@ _CHARGER_OPTIONAL_DOMAINS = {
 _BATTERY_OPTIONAL_DOMAINS = {CONF_BATTERY_POWER_ENTITY: "sensor"}
 _FORECAST_OPTIONAL_DOMAINS = {
     CONF_FORECAST_REMAINING_ENTITY: "sensor",
+    CONF_FORECAST_TODAY_ENTITY: "sensor",
     CONF_BATTERY_LEVEL_ENTITY: "sensor",
     CONF_SOLAR_POWER_ENTITY: "sensor",
 }
@@ -165,11 +167,12 @@ def validate_forecast(
     if errors := _validate_power_units(hass, user_input, (CONF_SOLAR_POWER_ENTITY,)):
         return errors
 
-    forecast_entity = user_input.get(CONF_FORECAST_REMAINING_ENTITY)
-    if forecast_entity:
-        forecast_state = hass.states.get(forecast_entity)
-        if forecast_state is not None and forecast_state.attributes.get("unit_of_measurement") not in _ENERGY_UNITS:
-            return {"base": "invalid_energy_unit"}
+    for key in (CONF_FORECAST_REMAINING_ENTITY, CONF_FORECAST_TODAY_ENTITY):
+        forecast_entity = user_input.get(key)
+        if forecast_entity:
+            forecast_state = hass.states.get(forecast_entity)
+            if forecast_state is not None and forecast_state.attributes.get("unit_of_measurement") not in _ENERGY_UNITS:
+                return {"base": "invalid_energy_unit"}
 
     if any(user_input.get(key) for key in _EV_FIRST_KEYS) and not all(user_input.get(key) for key in _EV_FIRST_KEYS):
         return {"base": "ev_first_incomplete"}

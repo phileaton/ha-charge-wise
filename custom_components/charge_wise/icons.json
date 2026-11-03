@@ -33,6 +33,9 @@
       "forecast_surplus": {
         "default": "mdi:weather-sunny-alert"
       },
+      "forecast_accuracy": {
+        "default": "mdi:bullseye-arrow"
+      },
       "average_house_load": {
         "default": "mdi:home-lightning-bolt"
       }

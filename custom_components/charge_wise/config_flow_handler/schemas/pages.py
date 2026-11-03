@@ -27,7 +27,7 @@ from custom_components.charge_wise.const import (
     CONF_EV_CONNECTED_ENTITY,
     CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
     CONF_FORECAST_REMAINING_ENTITY,
-    CONF_FORECAST_TRUST_PERCENT,
+    CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_HARDWARE_MAXIMUM_ENTITY,
     CONF_HOUSE_LOAD_WINDOW_DAYS,
@@ -48,7 +48,6 @@ from custom_components.charge_wise.const import (
     DEFAULT_COOLDOWN_S,
     DEFAULT_CURRENT_DEADBAND_A,
     DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
-    DEFAULT_FORECAST_TRUST_PERCENT,
     DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
@@ -138,6 +137,7 @@ def forecast_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     """Build the page for forecast-based EV-first charging."""
     schema: Schema = {
         probatio.Optional(CONF_FORECAST_REMAINING_ENTITY): _SENSOR_SELECTOR,
+        probatio.Optional(CONF_FORECAST_TODAY_ENTITY): _SENSOR_SELECTOR,
         probatio.Optional(CONF_BATTERY_LEVEL_ENTITY): _SENSOR_SELECTOR,
         probatio.Optional(CONF_SOLAR_POWER_ENTITY): _SENSOR_SELECTOR,
         probatio.Optional(CONF_BATTERY_CAPACITY_KWH): selector.NumberSelector(
@@ -151,7 +151,6 @@ def forecast_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
         ),
     }
     _add_number_field(schema, defaults, CONF_BATTERY_TARGET_PERCENT, DEFAULT_BATTERY_TARGET_PERCENT, 1, 100, 1, "%")
-    _add_number_field(schema, defaults, CONF_FORECAST_TRUST_PERCENT, DEFAULT_FORECAST_TRUST_PERCENT, 1, 100, 1, "%")
     _add_number_field(
         schema,
         defaults,

@@ -44,6 +44,7 @@ _OWN_ENTITIES = (
     ("sensor", "average_house_load"),
     ("sensor", "battery_need"),
     ("sensor", "forecast_surplus"),
+    ("sensor", "forecast_accuracy"),
     ("sensor", "next_offpeak_window"),
     ("binary_sensor", "ev_first_active"),
 )

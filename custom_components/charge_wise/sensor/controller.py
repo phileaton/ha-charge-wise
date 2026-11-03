@@ -3,7 +3,7 @@
 from custom_components.charge_wise.sensor.entity import ChargeWiseSensorEntityDescription
 from custom_components.charge_wise.utils.charging_controller import ChargeWiseReason, ControllerStatus
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import EntityCategory, UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower
 
 ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
     ChargeWiseSensorEntityDescription(
@@ -61,6 +61,14 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=1,
         value_fn=lambda data: data.forecast_surplus_kwh,
+    ),
+    ChargeWiseSensorEntityDescription(
+        key="forecast_accuracy",
+        translation_key="forecast_accuracy",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.forecast_accuracy_percent,
     ),
     ChargeWiseSensorEntityDescription(
         key="requested_current",

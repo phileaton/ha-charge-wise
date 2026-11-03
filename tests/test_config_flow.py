@@ -132,7 +132,6 @@ async def test_options_flow_rejects_partial_ev_first_inputs(hass: HomeAssistant,
     pages[3] = {
         "forecast_remaining_entity": "sensor.forecast",
         "battery_target_percent": 90,
-        "forecast_trust_percent": 80,
     }
     result = await _walk_options(hass, config_entry, pages[:4])
 
@@ -154,7 +153,6 @@ async def test_options_flow_rejects_a_non_energy_forecast_sensor(
         "solar_power_entity": "sensor.grid_power",
         "battery_capacity_kwh": 27,
         "battery_target_percent": 90,
-        "forecast_trust_percent": 80,
     }
     result = await _walk_options(hass, config_entry, pages[:4])
 
@@ -175,7 +173,6 @@ async def test_options_flow_stores_ev_first_inputs(hass: HomeAssistant, config_e
         "solar_power_entity": "sensor.solar",
         "battery_capacity_kwh": 27,
         "battery_target_percent": 85,
-        "forecast_trust_percent": 70,
     }
     result = await _walk_options(hass, config_entry, pages)
 

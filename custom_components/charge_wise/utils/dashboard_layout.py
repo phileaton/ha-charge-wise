@@ -10,6 +10,7 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_POWER_ENTITY,
     CONF_CHARGER_POWER_ENTITY,
     CONF_FORECAST_REMAINING_ENTITY,
+    CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
     CONF_SOLAR_POWER_ENTITY,
@@ -206,10 +207,13 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
         ("average_house_load", "House average", "blue"),
         ("battery_need", "Battery still needs", "green"),
         ("forecast_surplus", "Forecast surplus", "yellow"),
+        ("forecast_accuracy", "Forecast accuracy", "orange"),
     )
     for key, name, color in tiles:
         if key in ids:
-            cards.append(_tile(ids[key], name, color, trend=key in {"house_load", "forecast_surplus"}))
+            cards.append(
+                _tile(ids[key], name, color, trend=key in {"house_load", "forecast_surplus", "forecast_accuracy"})
+            )
     if "battery_need" in ids and "forecast_surplus" in ids:
         cards.append(_budget_summary(ids))
     if "next_offpeak_window" in ids:
@@ -250,6 +254,8 @@ def _solar_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[C
     cards = [_heading("Solar and history", "mdi:solar-power-variant")]
     if forecast := options.get(CONF_FORECAST_REMAINING_ENTITY):
         cards.append(_tile(forecast, "Forecast remaining today", "orange", columns=12))
+    if forecast_today := options.get(CONF_FORECAST_TODAY_ENTITY):
+        cards.append(_tile(forecast_today, "Forecast total today", "orange", columns=12))
     power = [
         entity
         for entity in (

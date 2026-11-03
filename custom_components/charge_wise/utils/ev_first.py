@@ -9,7 +9,6 @@ class EvFirstConfig:
 
     battery_capacity_kwh: float
     battery_target_percent: float = 90
-    forecast_trust_percent: float = 80
     release_margin_percent: float = 10
 
 
@@ -22,6 +21,7 @@ class EvFirstInputs:
     house_use_kwh: float | None
     hours_until_sunset: float | None
     ev_energy_kwh: float = 0.0
+    forecast_accuracy: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,8 @@ def evaluate_ev_first(
 ) -> EvFirstResult | None:
     """Return the energy balance, or None while any input is unavailable or the sun is down.
 
+    forecast_accuracy is the measured share of the forecast that has actually materialised today (1.0 until known).
+
     ev_energy_kwh is the solar the EV has already used under EV-first. It is added back so the EV's own charging
     does not erode the surplus it was started on.
 
@@ -57,7 +59,7 @@ def evaluate_ev_first(
 
     missing_percent = max(0.0, config.battery_target_percent - inputs.battery_level_percent)
     battery_need_kwh = missing_percent / 100 * config.battery_capacity_kwh
-    trusted_forecast_kwh = max(0.0, inputs.forecast_remaining_kwh) * config.forecast_trust_percent / 100
+    trusted_forecast_kwh = max(0.0, inputs.forecast_remaining_kwh) * inputs.forecast_accuracy
     house_use_kwh = max(0.0, inputs.house_use_kwh)
     surplus_kwh = trusted_forecast_kwh - house_use_kwh + max(0.0, inputs.ev_energy_kwh)
     threshold_kwh = battery_need_kwh * (1 - config.release_margin_percent / 100) if was_active else battery_need_kwh

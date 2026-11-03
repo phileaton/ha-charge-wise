@@ -137,7 +137,7 @@ async def test_budget_sensors_publish_house_use_and_the_forecast_balance(
     assert float(house.state) == 1.9
     assert house.attributes["unit_of_measurement"] == "kW"
     assert float(need.state) == pytest.approx(10.8)
-    assert float(surplus.state) < 16
+    assert float(surplus.state) < 20
 
 
 async def test_ev_first_hold_state_is_restored_after_a_restart_on_the_same_day(
@@ -161,3 +161,28 @@ async def test_ev_first_hold_state_is_restored_after_a_restart_on_the_same_day(
 
     assert not coordinator._ev_first_was_active  # noqa: SLF001
     assert coordinator._ev_first_energy_kwh == 0.0  # noqa: SLF001
+
+
+async def test_measured_accuracy_scales_the_forecast_surplus(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+) -> None:
+    """When the panels deliver half of the forecast so far, only half of what remains is counted."""
+    coordinator = ev_first_entry.runtime_data.coordinator
+    accuracy_id = _entity_id(hass, ev_first_entry, "sensor", "forecast_accuracy")
+    assert hass.states.get(accuracy_id).state == "unknown"
+
+    today = dt_util.now().date()
+    coordinator.forecast_accuracy.restore(
+        {
+            "day": today.isoformat(),
+            "baseline_forecast_kwh": 0.0,
+            "latest_forecast_kwh": 10.0,
+            "actual_kwh": 5.0,
+        },
+        today,
+    )
+    await coordinator._async_evaluate()  # noqa: SLF001
+    await hass.async_block_till_done()
+
+    assert float(hass.states.get(accuracy_id).state) == pytest.approx(50)

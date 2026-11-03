@@ -42,6 +42,7 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert {"sensor.grid_power", "sensor.charger_power", "sensor.battery_power"} <= entities
     assert "sensor.test_charger_house_consumption" in entities
     assert "sensor.test_charger_available_solar_budget" in entities
+    assert "sensor.test_charger_forecast_accuracy" in entities
     assert any(card["type"] == "gauge" for card in cards)
     assert any(card["type"] == "history-graph" for card in cards)
     controls = next(card for card in cards if card["type"] == "entities")

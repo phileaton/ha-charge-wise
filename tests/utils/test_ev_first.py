@@ -2,7 +2,7 @@
 
 from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstInputs, evaluate_ev_first
 
-CONFIG = EvFirstConfig(battery_capacity_kwh=27, battery_target_percent=90, forecast_trust_percent=80)
+CONFIG = EvFirstConfig(battery_capacity_kwh=27, battery_target_percent=90)
 
 
 def _inputs(**overrides: float | None) -> EvFirstInputs:
@@ -11,6 +11,7 @@ def _inputs(**overrides: float | None) -> EvFirstInputs:
         "battery_level_percent": 50,
         "house_use_kwh": 3,
         "hours_until_sunset": 6,
+        "forecast_accuracy": 0.8,
     }
     values.update(overrides)
     return EvFirstInputs(**values)
@@ -81,7 +82,7 @@ def test_ev_energy_is_added_back_to_the_surplus() -> None:
 
 def test_zero_margin_releases_as_soon_as_the_surplus_is_short() -> None:
     """With no margin the held state gives no extra room."""
-    config = EvFirstConfig(battery_capacity_kwh=27, forecast_trust_percent=80, release_margin_percent=0)
+    config = EvFirstConfig(battery_capacity_kwh=27, release_margin_percent=0)
 
     result = evaluate_ev_first(config, _inputs(forecast_remaining_kwh=17), was_active=True)
 

@@ -38,6 +38,7 @@ class ChargeWiseSnapshot:
     house_load_w: float | None = None
     battery_need_kwh: float | None = None
     forecast_surplus_kwh: float | None = None
+    forecast_accuracy_percent: float | None = None
 
 
 @dataclass
