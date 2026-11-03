@@ -10,6 +10,7 @@ class EvFirstConfig:
     battery_capacity_kwh: float
     battery_target_percent: float = 90
     forecast_trust_percent: float = 80
+    release_margin_percent: float = 10
 
 
 @dataclass(frozen=True)
@@ -28,15 +29,19 @@ class EvFirstResult:
 
     battery_need_kwh: float
     forecast_surplus_kwh: float
-
-    @property
-    def active(self) -> bool:
-        """Return whether the trusted forecast covers the battery's remaining need."""
-        return self.forecast_surplus_kwh >= self.battery_need_kwh
+    active: bool
 
 
-def evaluate_ev_first(config: EvFirstConfig, inputs: EvFirstInputs) -> EvFirstResult | None:
-    """Return the energy balance, or None while any input is unavailable or the sun is down."""
+def evaluate_ev_first(
+    config: EvFirstConfig,
+    inputs: EvFirstInputs,
+    *,
+    was_active: bool = False,
+) -> EvFirstResult | None:
+    """Return the energy balance, or None while any input is unavailable or the sun is down.
+
+    Once active, EV-first stays active until the surplus falls config.release_margin_percent below the need.
+    """
     if (
         inputs.forecast_remaining_kwh is None
         or inputs.battery_level_percent is None
@@ -50,4 +55,6 @@ def evaluate_ev_first(config: EvFirstConfig, inputs: EvFirstInputs) -> EvFirstRe
     battery_need_kwh = missing_percent / 100 * config.battery_capacity_kwh
     trusted_forecast_kwh = max(0.0, inputs.forecast_remaining_kwh) * config.forecast_trust_percent / 100
     house_use_kwh = max(0.0, inputs.house_use_kwh)
-    return EvFirstResult(battery_need_kwh, trusted_forecast_kwh - house_use_kwh)
+    surplus_kwh = trusted_forecast_kwh - house_use_kwh
+    threshold_kwh = battery_need_kwh * (1 - config.release_margin_percent / 100) if was_active else battery_need_kwh
+    return EvFirstResult(battery_need_kwh, surplus_kwh, surplus_kwh >= threshold_kwh)

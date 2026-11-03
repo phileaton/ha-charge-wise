@@ -22,6 +22,7 @@ from custom_components.charge_wise.const import (
     CONF_CURRENT_DEADBAND_A,
     CONF_CURRENT_TARGET_ENTITY,
     CONF_EV_CONNECTED_ENTITY,
+    CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TRUST_PERCENT,
     CONF_GRID_POWER_ENTITY,
@@ -44,6 +45,7 @@ from custom_components.charge_wise.const import (
     DEFAULT_BATTERY_TARGET_PERCENT,
     DEFAULT_COOLDOWN_S,
     DEFAULT_CURRENT_DEADBAND_A,
+    DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
     DEFAULT_FORECAST_TRUST_PERCENT,
     DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
@@ -115,6 +117,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self.offpeak_current_a = self.manual_current_a
         self.windows = windows_from_options(self.options.get(CONF_OFFPEAK_WINDOWS))
         self.ev_first_config = self._ev_first_config_from_options()
+        self._ev_first_was_active = False
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
         self.house_load = HouseLoadProfile(
@@ -276,6 +279,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         )
         ev_first_result = self._ev_first_result(now)
         ev_first_active = self._ev_first_enabled() and ev_first_result is not None and ev_first_result.active
+        self._ev_first_was_active = ev_first_active
         readings = self._read_inputs(ev_first_active=ev_first_active)
         decision = self.controller.evaluate(settings, readings, now)
         self._log_decision_change(decision, readings)
@@ -410,6 +414,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             battery_capacity_kwh=float(self.options[CONF_BATTERY_CAPACITY_KWH]),
             battery_target_percent=float(self.options.get(CONF_BATTERY_TARGET_PERCENT, DEFAULT_BATTERY_TARGET_PERCENT)),
             forecast_trust_percent=float(self.options.get(CONF_FORECAST_TRUST_PERCENT, DEFAULT_FORECAST_TRUST_PERCENT)),
+            release_margin_percent=float(
+                self.options.get(CONF_EV_FIRST_RELEASE_MARGIN_PERCENT, DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT),
+            ),
         )
 
     def _ev_first_result(self, now: datetime) -> EvFirstResult | None:
@@ -432,7 +439,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                     )
         return evaluate_ev_first(
             self.ev_first_config,
-            EvFirstInputs(
+            was_active=self._ev_first_was_active,
+            inputs=EvFirstInputs(
                 forecast_remaining_kwh=self._energy_kwh(self.options.get(CONF_FORECAST_REMAINING_ENTITY)),
                 battery_level_percent=self._number_value(self.options.get(CONF_BATTERY_LEVEL_ENTITY)),
                 house_use_kwh=house_use_kwh,

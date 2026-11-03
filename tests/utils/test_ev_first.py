@@ -43,6 +43,37 @@ def test_battery_above_target_needs_nothing() -> None:
     assert result.active
 
 
+def test_active_state_holds_within_the_release_margin() -> None:
+    """A surplus 10.6 kWh against a 10.8 kWh need stays active once active, but does not start."""
+    inputs = _inputs(forecast_remaining_kwh=17)
+
+    started = evaluate_ev_first(CONFIG, inputs)
+    held = evaluate_ev_first(CONFIG, inputs, was_active=True)
+
+    assert started is not None
+    assert held is not None
+    assert not started.active
+    assert held.active
+
+
+def test_active_state_releases_below_the_margin() -> None:
+    """A surplus of 8.6 kWh is more than 10% under the 10.8 kWh need, so it releases."""
+    result = evaluate_ev_first(CONFIG, _inputs(forecast_remaining_kwh=14.5), was_active=True)
+
+    assert result is not None
+    assert not result.active
+
+
+def test_zero_margin_releases_as_soon_as_the_surplus_is_short() -> None:
+    """With no margin the held state gives no extra room."""
+    config = EvFirstConfig(battery_capacity_kwh=27, forecast_trust_percent=80, release_margin_percent=0)
+
+    result = evaluate_ev_first(config, _inputs(forecast_remaining_kwh=17), was_active=True)
+
+    assert result is not None
+    assert not result.active
+
+
 def test_missing_input_or_set_sun_returns_none() -> None:
     """Any unavailable input, or no daylight left, disables EV-first."""
     for field in ("forecast_remaining_kwh", "battery_level_percent", "house_use_kwh", "hours_until_sunset"):

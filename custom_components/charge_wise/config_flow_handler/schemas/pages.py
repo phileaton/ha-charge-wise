@@ -25,6 +25,7 @@ from custom_components.charge_wise.const import (
     CONF_CURRENT_DEADBAND_A,
     CONF_CURRENT_TARGET_ENTITY,
     CONF_EV_CONNECTED_ENTITY,
+    CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TRUST_PERCENT,
     CONF_GRID_POWER_ENTITY,
@@ -46,6 +47,7 @@ from custom_components.charge_wise.const import (
     DEFAULT_BATTERY_TARGET_PERCENT,
     DEFAULT_COOLDOWN_S,
     DEFAULT_CURRENT_DEADBAND_A,
+    DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
     DEFAULT_FORECAST_TRUST_PERCENT,
     DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
@@ -150,6 +152,16 @@ def forecast_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     }
     _add_number_field(schema, defaults, CONF_BATTERY_TARGET_PERCENT, DEFAULT_BATTERY_TARGET_PERCENT, 1, 100, 1, "%")
     _add_number_field(schema, defaults, CONF_FORECAST_TRUST_PERCENT, DEFAULT_FORECAST_TRUST_PERCENT, 1, 100, 1, "%")
+    _add_number_field(
+        schema,
+        defaults,
+        CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
+        DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
+        0,
+        50,
+        1,
+        "%",
+    )
     _add_number_field(
         schema,
         defaults,

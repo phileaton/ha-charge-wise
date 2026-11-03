@@ -740,6 +740,13 @@ Add:
 - Better error handling
 - Retry limits
 - Sensor availability monitoring
+- Failed charging start monitoring and recovery: detect when a charge
+  start request does not result in charging (after the retry limit), expose
+  it as a diagnostic binary sensor, and, if the charger supports it, offer a
+  charger reboot (for OCPP, a `Reset` request) as an opt-in recovery action.
+  Needs research first: whether the Wallbox Pulsar Plus / the OCPP
+  integration supports a remote reset, and how to avoid reboot loops
+  (attempt limit and cooldown).
 - More comprehensive tests
 - Diagnostics and logging
 
@@ -769,6 +776,11 @@ Add:
 Potential future features:
 
 - Solar generation forecasts
+- Forecast vs. actual tracking: compare today's solar production so far with
+  the forecast (e.g. Solcast) and adjust charging when they diverge, such as
+  adding grid assistance or shifting the schedule when production falls
+  short. Needs a decision on what actions to take and how large a deviation
+  must be before acting.
 - Household consumption forecasts
 - Battery charge/discharge forecasting
 - Multi-EV support

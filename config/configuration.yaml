@@ -9,6 +9,10 @@
 homeassistant:
   debug: true
 
+energy:
+  # Enable energy dashboard for development
+  # https://www.home-assistant.io/integrations/energy/
+
 # Debugging integration
 # https://www.home-assistant.io/integrations/debugpy/
 debugpy:
