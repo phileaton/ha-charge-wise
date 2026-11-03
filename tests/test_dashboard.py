@@ -7,6 +7,7 @@ from homeassistant.components.frontend import DATA_PANELS
 from homeassistant.components.lovelace import LovelaceData
 from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.template import Template
 
 URL_PATH = "test-charger"
 
@@ -33,13 +34,19 @@ async def test_dashboard_is_created_with_the_entry_entities(
 
     dashboard = hass.data[LOVELACE_DATA].dashboards[URL_PATH]
     config = await dashboard.async_load(False)
-    controls, status, history = config["views"][0]["cards"]
+    view = config["views"][0]
+    cards = [card for section in view["sections"] for card in section["cards"]]
+    entities = {card["entity"] for card in cards if "entity" in card}
     assert URL_PATH in hass.data[DATA_PANELS]
-    assert any(entity.startswith("switch.test_charger") for entity in controls["entities"])
+    assert view["type"] == "sections"
+    assert {"sensor.grid_power", "sensor.charger_power", "sensor.battery_power"} <= entities
+    assert "sensor.test_charger_house_consumption" in entities
+    assert "sensor.test_charger_available_solar_budget" in entities
+    assert any(card["type"] == "gauge" for card in cards)
+    assert any(card["type"] == "history-graph" for card in cards)
+    controls = next(card for card in cards if card["type"] == "entities")
     assert len(controls["entities"]) == 7
-    assert "sensor.test_charger_controller_status" in status["entities"]
-    assert history["type"] == "history-graph"
-    assert "binary_sensor.test_charger_battery_protection_active" in status["entities"]
+    assert any(entity.startswith("switch.test_charger") for entity in controls["entities"])
 
 
 async def test_dashboard_is_not_created_unless_requested(
@@ -71,3 +78,25 @@ async def test_dashboard_is_removed_when_turned_off_or_the_entry_is_deleted(
     assert await hass.config_entries.async_remove(config_entry.entry_id)
     await hass.async_block_till_done()
     assert URL_PATH not in hass.data[LOVELACE_DATA].dashboards
+
+
+async def test_dashboard_templates_render_the_live_flow(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """The markdown cards are valid templates that describe the current power flow."""
+    await _setup(hass, config_entry, create=True)
+    watts = {"unit_of_measurement": "W"}
+    hass.states.async_set("sensor.grid_power", "-1500", watts)
+    hass.states.async_set("sensor.charger_power", "2000", watts)
+    hass.states.async_set("sensor.battery_power", "-500", watts)
+    await hass.async_block_till_done()
+
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    markdown = [
+        card for section in config["views"][0]["sections"] for card in section["cards"] if card["type"] == "markdown"
+    ]
+    rendered = [Template(card["content"], hass).async_render() for card in markdown]
+
+    assert any("Exporting 1.5 kW" in text and "Battery charging 0.5 kW" in text for text in rendered)
+    assert any("EV charging at 2.0 kW" in text for text in rendered)

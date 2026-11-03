@@ -24,6 +24,15 @@
       "next_offpeak_window": {
         "default": "mdi:calendar-clock"
       },
+      "house_load": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
+      "battery_need": {
+        "default": "mdi:battery-arrow-up-outline"
+      },
+      "forecast_surplus": {
+        "default": "mdi:weather-sunny-alert"
+      },
       "average_house_load": {
         "default": "mdi:home-lightning-bolt"
       }

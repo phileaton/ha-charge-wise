@@ -3,7 +3,7 @@
 from custom_components.charge_wise.sensor.entity import ChargeWiseSensorEntityDescription
 from custom_components.charge_wise.utils.charging_controller import ChargeWiseReason, ControllerStatus
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import EntityCategory, UnitOfElectricCurrent, UnitOfPower
+from homeassistant.const import EntityCategory, UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower
 
 ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
     ChargeWiseSensorEntityDescription(
@@ -31,6 +31,33 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         suggested_display_precision=0,
         value_fn=lambda data: data.average_house_load_w,
+    ),
+    ChargeWiseSensorEntityDescription(
+        key="house_load",
+        translation_key="house_load",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.house_load_w,
+    ),
+    ChargeWiseSensorEntityDescription(
+        key="battery_need",
+        translation_key="battery_need",
+        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.battery_need_kwh,
+    ),
+    ChargeWiseSensorEntityDescription(
+        key="forecast_surplus",
+        translation_key="forecast_surplus",
+        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.forecast_surplus_kwh,
     ),
     ChargeWiseSensorEntityDescription(
         key="requested_current",

@@ -117,3 +117,23 @@ async def test_house_power_is_production_plus_grid_and_battery_less_charger(
 
     hass.states.async_set("sensor.solar_production", "unavailable", watts)
     assert coordinator._house_power_w() is None  # noqa: SLF001
+
+
+async def test_budget_sensors_publish_house_use_and_the_forecast_balance(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+) -> None:
+    """The dashboard's budget figures come from the same calculation the controller uses."""
+    watts = {"unit_of_measurement": "W"}
+    hass.states.async_set("sensor.solar_production", "3000", watts)
+    hass.states.async_set("sensor.grid_power", "-500", watts)
+    hass.states.async_set("sensor.charger_power", "1000", watts)
+    hass.states.async_set("sensor.battery_power", "400", watts)
+    await hass.async_block_till_done()
+
+    house = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "house_load"))
+    need = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "battery_need"))
+    surplus = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "forecast_surplus"))
+    assert float(house.state) == 1900
+    assert float(need.state) == pytest.approx(10.8)
+    assert float(surplus.state) < 16

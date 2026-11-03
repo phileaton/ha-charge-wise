@@ -274,7 +274,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             offpeak_active=offpeak_active,
             offpeak_next_change=next_change(self.windows, local_now),
         )
-        ev_first_active = self._ev_first_active(now)
+        ev_first_result = self._ev_first_result(now)
+        ev_first_active = self._ev_first_enabled() and ev_first_result is not None and ev_first_result.active
         readings = self._read_inputs(ev_first_active=ev_first_active)
         decision = self.controller.evaluate(settings, readings, now)
         self._log_decision_change(decision, readings)
@@ -290,6 +291,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                     offpeak_active,
                     next_start_at,
                     ev_first_active,
+                    ev_first_result,
                     status=ControllerStatus.ERROR,
                     reason=ChargeWiseReason.CONTROL_FAILED,
                     requested_current_a=0.0,
@@ -298,7 +300,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self._cancel_timer()
             return
 
-        self.async_set_updated_data(self._snapshot(decision, offpeak_active, next_start_at, ev_first_active))
+        self.async_set_updated_data(
+            self._snapshot(decision, offpeak_active, next_start_at, ev_first_active, ev_first_result),
+        )
         self._schedule_timer(decision)
 
     def _snapshot(
@@ -307,6 +311,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         offpeak_active: bool,
         next_offpeak_start: datetime | None,
         ev_first_active: bool,
+        ev_first_result: EvFirstResult | None,
         *,
         status: ControllerStatus | None = None,
         reason: ChargeWiseReason | None = None,
@@ -330,6 +335,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             offpeak_current_a=self.offpeak_current_a,
             battery_protection_active=decision.battery_protection_active,
             average_house_load_w=self.house_load.overall_w,
+            house_load_w=self._house_power_w(),
+            battery_need_kwh=ev_first_result.battery_need_kwh if ev_first_result else None,
+            forecast_surplus_kwh=ev_first_result.forecast_surplus_kwh if ev_first_result else None,
         )
 
     def _observe_house_load(self, now: datetime) -> None:
@@ -432,12 +440,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             ),
         )
 
-    def _ev_first_active(self, now: datetime) -> bool:
-        """Return whether the EV may currently share the battery's charging power."""
-        if not (self.switches["ev_first_enabled"] and self.switches["solar_enabled"]):
-            return False
-        result = self._ev_first_result(now)
-        return result is not None and result.active
+    def _ev_first_enabled(self) -> bool:
+        """Return whether the user allows the EV to share the battery's charging power."""
+        return self.switches["ev_first_enabled"] and self.switches["solar_enabled"]
 
     def _energy_kwh(self, entity_id: str | None) -> float | None:
         """Return a finite energy reading converted to kWh."""

@@ -354,6 +354,15 @@
       },
       "average_house_load": {
         "name": "Average house consumption"
+      },
+      "house_load": {
+        "name": "House consumption"
+      },
+      "battery_need": {
+        "name": "Battery energy needed"
+      },
+      "forecast_surplus": {
+        "name": "Forecast surplus after house use"
       }
     },
     "binary_sensor": {

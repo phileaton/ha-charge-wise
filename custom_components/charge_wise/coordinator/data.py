@@ -35,6 +35,9 @@ class ChargeWiseSnapshot:
     offpeak_current_a: float
     battery_protection_active: bool | None
     average_house_load_w: float | None = None
+    house_load_w: float | None = None
+    battery_need_kwh: float | None = None
+    forecast_surplus_kwh: float | None = None
 
 
 @dataclass

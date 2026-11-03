@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from custom_components.charge_wise.const import DOMAIN
+from custom_components.charge_wise.utils.dashboard_layout import build_view
 from homeassistant.components import frontend
 from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.components.lovelace.dashboard import LovelaceStorage
@@ -33,57 +34,35 @@ _CONTROLS = (
     ("number", "manual_current"),
     ("number", "offpeak_current"),
 )
-_STATUS = (
+_OWN_ENTITIES = (
+    *_CONTROLS,
     ("sensor", "controller_status"),
     ("sensor", "decision_reason"),
     ("sensor", "requested_current"),
     ("sensor", "available_solar_budget"),
-    ("binary_sensor", "ev_first_active"),
+    ("sensor", "house_load"),
     ("sensor", "average_house_load"),
-    ("binary_sensor", "offpeak_active"),
+    ("sensor", "battery_need"),
+    ("sensor", "forecast_surplus"),
     ("sensor", "next_offpeak_window"),
-    ("binary_sensor", "battery_protection"),
-)
-_HISTORY = (
-    ("sensor", "requested_current"),
-    ("sensor", "available_solar_budget"),
-    ("sensor", "average_house_load"),
+    ("binary_sensor", "ev_first_active"),
 )
 
 
-def _entity_ids(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    keys: tuple[tuple[str, str], ...],
-) -> list[str]:
-    """Return the entity IDs that exist for these platform and key pairs, in order."""
+def _entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, str]:
+    """Return the registered entity IDs of this entry by key, leaving out any that do not exist."""
     registry = er.async_get(hass)
-    found = (registry.async_get_entity_id(platform, DOMAIN, f"{entry.entry_id}_{key}") for platform, key in keys)
-    return [entity_id for entity_id in found if entity_id]
+    found = {
+        key: registry.async_get_entity_id(platform, DOMAIN, f"{entry.entry_id}_{key}")
+        for platform, key in _OWN_ENTITIES
+    }
+    return {key: entity_id for key, entity_id in found.items() if entity_id}
 
 
 def build_config(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Build the dashboard from the entities this entry registered."""
-    cards: list[dict[str, Any]] = [
-        {
-            "type": "entities",
-            "title": f"{entry.title} controls",
-            "show_header_toggle": False,
-            "entities": _entity_ids(hass, entry, _CONTROLS),
-        },
-        {
-            "type": "entities",
-            "title": f"{entry.title} status",
-            "entities": _entity_ids(hass, entry, _STATUS),
-        },
-        {
-            "type": "history-graph",
-            "title": "Charging controller",
-            "hours_to_show": 24,
-            "entities": _entity_ids(hass, entry, _HISTORY),
-        },
-    ]
-    return {"views": [{"title": entry.title, "path": "charge-wise", "cards": cards}]}
+    view = build_view(entry.title, _entity_ids(hass, entry), entry.options, tuple(key for _, key in _CONTROLS))
+    return {"views": [view]}
 
 
 def _url_path(entry: ConfigEntry) -> str:
