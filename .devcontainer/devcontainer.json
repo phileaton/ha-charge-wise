@@ -88,8 +88,7 @@
       ]
     }
   },
-  "forwardPorts": [8123],
-  "appPort": ["0.0.0.0:9000:9000"],
+  "appPort": ["0.0.0.0:9000:9000", "0.0.0.0:8123:8123"],
   "portsAttributes": {
     "8123": {
       "label": "Home Assistant",
