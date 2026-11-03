@@ -96,7 +96,6 @@ _ENERGY_FACTORS_KWH: dict[str, float] = {
     UnitOfEnergy.MEGA_WATT_HOUR: 1000.0,
 }
 
-EV_FIRST_MAX_ELAPSED_S = 300
 SWITCH_COMMAND_GRACE_S = 30
 
 type SwitchKey = Literal["enabled", "solar_enabled", "offpeak_enabled", "manual_override", "ev_first_enabled"]
@@ -121,9 +120,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self.windows = windows_from_options(self.options.get(CONF_OFFPEAK_WINDOWS))
         self.ev_first_config = self._ev_first_config_from_options()
         self._ev_first_was_active = False
-        self._ev_first_energy_kwh = 0.0
         self.forecast_accuracy = ForecastAccuracy()
-        self._ev_first_last_at: datetime | None = None
         self._last_switch_command: tuple[bool, datetime] | None = None
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
@@ -234,7 +231,6 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         return {
             "date": dt_util.now().date().isoformat(),
             "was_active": self._ev_first_was_active,
-            "energy_kwh": self._ev_first_energy_kwh,
             "accuracy": self.forecast_accuracy.as_dict(),
         }
 
@@ -243,15 +239,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         if not data or data.get("date") != dt_util.now().date().isoformat():
             return
         self._ev_first_was_active = bool(data.get("was_active", False))
-        try:
-            self._ev_first_energy_kwh = max(0.0, float(data.get("energy_kwh", 0.0)))
-        except TypeError, ValueError:
-            self._ev_first_energy_kwh = 0.0
 
     def _reset_ev_first(self) -> None:
         """Forget the EV-first hold state."""
         self._ev_first_was_active = False
-        self._ev_first_energy_kwh = 0.0
 
     async def async_set_switch(self, key: SwitchKey, value: bool, *, restoring: bool = False) -> None:
         """Turn a charging source on or off; a restored source waits through the safety cooldown."""
@@ -315,7 +306,6 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             offpeak_active=offpeak_active,
             offpeak_next_change=next_change(self.windows, local_now),
         )
-        self._accumulate_ev_first_energy(now)
         self._observe_forecast_accuracy(now)
         ev_first_result = self._ev_first_result(now)
         ev_first_active = self._ev_first_enabled() and ev_first_result is not None and ev_first_result.active
@@ -461,23 +451,6 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             forecast_so_far,
         )
 
-    def _accumulate_ev_first_energy(self, now: datetime) -> None:
-        """Add the charger energy used since the last evaluation while EV-first was active."""
-        last = self._ev_first_last_at
-        self._ev_first_last_at = now
-        if (
-            not self._ev_first_enabled()
-            or last is None
-            or not self._ev_first_was_active
-            or self.ev_first_config is None
-        ):
-            return
-        power_w = self._power_w(self.options[CONF_CHARGER_POWER_ENTITY])
-        if power_w is None:
-            return
-        elapsed_s = min((now - last).total_seconds(), EV_FIRST_MAX_ELAPSED_S)
-        self._ev_first_energy_kwh += max(0.0, power_w) * elapsed_s / 3_600_000
-
     def _ev_first_config_from_options(self) -> EvFirstConfig | None:
         """Return the EV-first settings, or None when the forecast inputs are not all configured."""
         keys = (
@@ -504,8 +477,6 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         hours_until_sunset: float | None = None
         house_use_kwh: float | None = None
         instant_w = self._house_power_w()
-        if sun_state is not None and sun_state.state != "above_horizon":
-            self._ev_first_energy_kwh = 0.0
         if sun_state is not None and sun_state.state == "above_horizon":
             setting = dt_util.parse_datetime(str(sun_state.attributes.get("next_setting", "")))
             if setting is not None:
@@ -524,7 +495,6 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 battery_level_percent=self._number_value(self.options.get(CONF_BATTERY_LEVEL_ENTITY)),
                 house_use_kwh=house_use_kwh,
                 hours_until_sunset=hours_until_sunset,
-                ev_energy_kwh=self._ev_first_energy_kwh,
                 forecast_accuracy=self.forecast_accuracy.ratio or 1.0,
             ),
         )
