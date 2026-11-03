@@ -79,6 +79,7 @@ async def test_offpeak_window_charges_from_the_grid_and_stops_outside_it(
 
     freezer.move_to("2026-01-07 11:00:00+00:00")
     await _turn_on(hass, init_integration, "enabled", "offpeak_enabled")
+    freezer.tick(31)
     hass.services.async_register("switch", "turn_on", turn_on)
     hass.services.async_register("switch", "turn_off", turn_off)
     coordinator = init_integration.runtime_data.coordinator
@@ -99,6 +100,37 @@ async def test_offpeak_window_charges_from_the_grid_and_stops_outside_it(
     assert hass.states.get(reason_entity).state == "offpeak_waiting"
     assert hass.states.get("switch.charger_enable").state == "off"
     assert hass.states.get(next_entity).state == "2026-01-08T08:00:00+00:00"
+
+
+async def test_pending_switch_command_is_not_repeated(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A slow charger that has not reported back yet is not sent the same command again."""
+    commands: list[str] = []
+
+    async def turn_on(call: ServiceCall) -> None:
+        commands.append("on")
+
+    async def turn_off(call: ServiceCall) -> None:
+        commands.append("off")
+
+    freezer.move_to("2026-01-07 11:00:00+00:00")
+    await _turn_on(hass, init_integration, "enabled", "offpeak_enabled")
+    freezer.tick(31)
+    hass.services.async_register("switch", "turn_on", turn_on)
+    hass.services.async_register("switch", "turn_off", turn_off)
+    coordinator = init_integration.runtime_data.coordinator
+    for current in (10, 11, 12):
+        await coordinator.async_set_offpeak_current(current)
+    await hass.async_block_till_done()
+    assert commands == ["on"]
+
+    freezer.tick(31)
+    await coordinator.async_set_offpeak_current(13)
+    await hass.async_block_till_done()
+    assert commands == ["on", "on"]
 
 
 async def test_legacy_demo_entry_has_an_actionable_setup_error(

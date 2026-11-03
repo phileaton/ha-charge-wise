@@ -97,6 +97,7 @@ _ENERGY_FACTORS_KWH: dict[str, float] = {
 }
 
 EV_FIRST_MAX_ELAPSED_S = 300
+SWITCH_COMMAND_GRACE_S = 30
 
 type SwitchKey = Literal["enabled", "solar_enabled", "offpeak_enabled", "manual_override", "ev_first_enabled"]
 
@@ -123,6 +124,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self._ev_first_energy_kwh = 0.0
         self.forecast_accuracy = ForecastAccuracy()
         self._ev_first_last_at: datetime | None = None
+        self._last_switch_command: tuple[bool, datetime] | None = None
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
         self.house_load = HouseLoadProfile(
@@ -612,7 +614,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         switch_state = self.hass.states.get(switch_entity)
 
         if not decision.charger_enabled:
-            if switch_state is None or switch_state.state != STATE_OFF:
+            if (switch_state is None or switch_state.state != STATE_OFF) and self._switch_command_due(False):
                 await self.hass.services.async_call(
                     "switch",
                     "turn_off",
@@ -638,13 +640,22 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 blocking=True,
             )
 
-        if switch_state is None or switch_state.state != STATE_ON:
+        if (switch_state is None or switch_state.state != STATE_ON) and self._switch_command_due(True):
             await self.hass.services.async_call(
                 "switch",
                 "turn_on",
                 {ATTR_ENTITY_ID: switch_entity},
                 blocking=True,
             )
+
+    def _switch_command_due(self, turn_on: bool) -> bool:
+        """Return False while an identical command is still waiting for the charger to report back."""
+        now = dt_util.utcnow()
+        last = self._last_switch_command
+        if last is not None and last[0] == turn_on and (now - last[1]).total_seconds() < SWITCH_COMMAND_GRACE_S:
+            return False
+        self._last_switch_command = (turn_on, now)
+        return True
 
     async def _async_fail_safe(self) -> None:
         """Try to disable charging after a failed target or switch command."""
