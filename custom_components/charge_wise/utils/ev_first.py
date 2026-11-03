@@ -21,6 +21,7 @@ class EvFirstInputs:
     battery_level_percent: float | None
     house_use_kwh: float | None
     hours_until_sunset: float | None
+    ev_energy_kwh: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,9 @@ def evaluate_ev_first(
 ) -> EvFirstResult | None:
     """Return the energy balance, or None while any input is unavailable or the sun is down.
 
+    ev_energy_kwh is the solar the EV has already used under EV-first. It is added back so the EV's own charging
+    does not erode the surplus it was started on.
+
     Once active, EV-first stays active until the surplus falls config.release_margin_percent below the need.
     """
     if (
@@ -55,6 +59,6 @@ def evaluate_ev_first(
     battery_need_kwh = missing_percent / 100 * config.battery_capacity_kwh
     trusted_forecast_kwh = max(0.0, inputs.forecast_remaining_kwh) * config.forecast_trust_percent / 100
     house_use_kwh = max(0.0, inputs.house_use_kwh)
-    surplus_kwh = trusted_forecast_kwh - house_use_kwh
+    surplus_kwh = trusted_forecast_kwh - house_use_kwh + max(0.0, inputs.ev_energy_kwh)
     threshold_kwh = battery_need_kwh * (1 - config.release_margin_percent / 100) if was_active else battery_need_kwh
     return EvFirstResult(battery_need_kwh, surplus_kwh, surplus_kwh >= threshold_kwh)

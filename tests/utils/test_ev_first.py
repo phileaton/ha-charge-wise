@@ -64,6 +64,21 @@ def test_active_state_releases_below_the_margin() -> None:
     assert not result.active
 
 
+def test_ev_energy_is_added_back_to_the_surplus() -> None:
+    """Solar the EV already used does not count against the surplus it started on."""
+    inputs = _inputs(forecast_remaining_kwh=14.5)
+    compensated = _inputs(forecast_remaining_kwh=14.5, ev_energy_kwh=3)
+
+    plain = evaluate_ev_first(CONFIG, inputs, was_active=True)
+    held = evaluate_ev_first(CONFIG, compensated, was_active=True)
+
+    assert plain is not None
+    assert held is not None
+    assert not plain.active
+    assert held.active
+    assert held.forecast_surplus_kwh == plain.forecast_surplus_kwh + 3
+
+
 def test_zero_margin_releases_as_soon_as_the_surplus_is_short() -> None:
     """With no margin the held state gives no extra room."""
     config = EvFirstConfig(battery_capacity_kwh=27, forecast_trust_percent=80, release_margin_percent=0)
