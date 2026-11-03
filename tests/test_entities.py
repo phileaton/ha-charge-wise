@@ -104,7 +104,7 @@ async def test_solar_budget_uses_charger_power_and_signed_grid_power(
 
     solar_entity = _entity_id(hass, init_integration, "sensor", "available_solar_budget")
     status_entity = _entity_id(hass, init_integration, "sensor", "controller_status")
-    assert float(hass.states.get(solar_entity).state) == 1000
+    assert float(hass.states.get(solar_entity).state) == 1.0
     assert hass.states.get(status_entity).state == "waiting"
 
 

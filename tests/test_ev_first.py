@@ -77,7 +77,7 @@ async def test_ev_first_adds_battery_charge_power_to_the_solar_budget(
     active = _entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active")
     budget = _entity_id(hass, ev_first_entry, "sensor", "available_solar_budget")
     assert hass.states.get(active).state == "on"
-    assert float(hass.states.get(budget).state) == 2000
+    assert float(hass.states.get(budget).state) == 2.0
 
     hass.states.async_set("sensor.forecast_remaining", "5", {"unit_of_measurement": "kWh"})
     await hass.async_block_till_done()
@@ -134,6 +134,7 @@ async def test_budget_sensors_publish_house_use_and_the_forecast_balance(
     house = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "house_load"))
     need = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "battery_need"))
     surplus = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "forecast_surplus"))
-    assert float(house.state) == 1900
+    assert float(house.state) == 1.9
+    assert house.attributes["unit_of_measurement"] == "kW"
     assert float(need.state) == pytest.approx(10.8)
     assert float(surplus.state) < 16

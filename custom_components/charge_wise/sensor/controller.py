@@ -19,7 +19,8 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
-        suggested_display_precision=0,
+        suggested_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=1,
         value_fn=lambda data: data.available_solar_w,
     ),
     ChargeWiseSensorEntityDescription(
@@ -29,7 +30,8 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        suggested_display_precision=0,
+        suggested_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=1,
         value_fn=lambda data: data.average_house_load_w,
     ),
     ChargeWiseSensorEntityDescription(
@@ -38,7 +40,8 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
-        suggested_display_precision=0,
+        suggested_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=1,
         value_fn=lambda data: data.house_load_w,
     ),
     ChargeWiseSensorEntityDescription(

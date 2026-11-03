@@ -59,9 +59,26 @@ def _entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, str]:
     return {key: entity_id for key, entity_id in found.items() if entity_id}
 
 
+def _budget_in_kw(hass: HomeAssistant, entity_id: str | None) -> bool:
+    """Return whether the solar budget sensor reports kW, which is what new installs get."""
+    if entity_id is None:
+        return True
+    if (state := hass.states.get(entity_id)) is not None and (unit := state.attributes.get("unit_of_measurement")):
+        return unit == "kW"
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    return registry_entry is None or registry_entry.unit_of_measurement in (None, "kW")
+
+
 def build_config(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Build the dashboard from the entities this entry registered."""
-    view = build_view(entry.title, _entity_ids(hass, entry), entry.options, tuple(key for _, key in _CONTROLS))
+    ids = _entity_ids(hass, entry)
+    view = build_view(
+        entry.title,
+        ids,
+        entry.options,
+        tuple(key for _, key in _CONTROLS),
+        budget_in_kw=_budget_in_kw(hass, ids.get("available_solar_budget")),
+    )
     return {"views": [view]}
 
 

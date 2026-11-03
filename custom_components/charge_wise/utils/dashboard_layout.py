@@ -131,7 +131,11 @@ def _gauge_segments(*stops: tuple[float, str]) -> list[Card]:
     return [{"from": start, "color": color} for start, color in stops]
 
 
-def _battery_and_ev_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[Card]:
+def _battery_and_ev_section(
+    ids: Mapping[str, str],
+    options: Mapping[str, Any],
+    budget_divisor: int,
+) -> list[Card]:
     """Return the gauges for battery level, the solar budget and the requested charge current."""
     maximum_a = float(options.get(CONF_MAXIMUM_CURRENT_A, 32))
     voltage_v = float(options.get(CONF_VOLTAGE_V, DEFAULT_VOLTAGE_V))
@@ -157,9 +161,13 @@ def _battery_and_ev_section(ids: Mapping[str, str], options: Mapping[str, Any]) 
                 "entity": ids["available_solar_budget"],
                 "name": "Solar budget for the EV",
                 "min": 0,
-                "max": round(maximum_a * voltage_v),
+                "max": round(maximum_a * voltage_v / budget_divisor, 1),
                 "needle": True,
-                "segments": _gauge_segments((0, _GREY), (start_w, _AMBER), (start_w * 2, _GREEN)),
+                "segments": _gauge_segments(
+                    (0, _GREY),
+                    (start_w / budget_divisor, _AMBER),
+                    (start_w * 2 / budget_divisor, _GREEN),
+                ),
                 "grid_options": {"columns": 6, "rows": 3},
             },
         )
@@ -285,11 +293,16 @@ def build_view(
     ids: Mapping[str, str],
     options: Mapping[str, Any],
     control_keys: tuple[str, ...],
+    *,
+    budget_in_kw: bool = True,
 ) -> Card:
-    """Build the dashboard view from the entity IDs this entry registered and its configured source entities."""
+    """Build the dashboard view from the entity IDs this entry registered and its configured source entities.
+
+    The solar budget gauge needs its scale in the unit the sensor reports, which the user can change.
+    """
     sections = [
         _live_section(ids, options),
-        _battery_and_ev_section(ids, options),
+        _battery_and_ev_section(ids, options, 1000 if budget_in_kw else 1),
         _budget_section(ids, options),
         _solar_section(ids, options),
         _controls_section(ids, control_keys, title),
