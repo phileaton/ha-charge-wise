@@ -103,6 +103,37 @@ def test_battery_protection_is_confirmed_and_reduces_full_discharge() -> None:
     assert protected.battery_protection_active
 
 
+def test_battery_protection_ignores_a_brief_discharge_spike() -> None:
+    """A short spike while the charger ramps down does not enlarge the cut or pause charging."""
+    controller = ChargeWiseController(ControllerConfig())
+    steady = _readings(
+        grid_power_w=0,
+        charger_power_w=3000,
+        battery_discharge_w=600,
+        charger_enabled=True,
+        current_target_a=12,
+    )
+    spike = _readings(
+        grid_power_w=0,
+        charger_power_w=3000,
+        battery_discharge_w=3000,
+        charger_enabled=True,
+        current_target_a=12,
+    )
+    controller.evaluate(SOLAR, steady, START)
+    controller.evaluate(SOLAR, steady, START + timedelta(seconds=90))
+
+    during_spike = controller.evaluate(SOLAR, spike, START + timedelta(seconds=100))
+    after_spike = controller.evaluate(SOLAR, steady, START + timedelta(seconds=105))
+    sustained = controller.evaluate(SOLAR, spike, START + timedelta(seconds=110))
+    confirmed = controller.evaluate(SOLAR, spike, START + timedelta(seconds=200))
+
+    assert during_spike.requested_current_a == 9
+    assert after_spike.requested_current_a == 9
+    assert sustained.requested_current_a == 9
+    assert confirmed.status is ControllerStatus.PAUSED
+
+
 def test_battery_protection_stops_below_the_minimum_current() -> None:
     """Protection stops charging instead of requesting less than the configured minimum."""
     controller = ChargeWiseController(ControllerConfig())

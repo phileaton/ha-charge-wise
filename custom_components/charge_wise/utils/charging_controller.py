@@ -117,6 +117,7 @@ class ChargeWiseController:
         self._cooldown_until: datetime | None = None
         self._battery_protection_active = False
         self._battery_current_reduction_a = 0
+        self._battery_growth_since: datetime | None = None
         self._safety_paused = False
         self._solar_samples: list[tuple[datetime, float]] = []
         self._hold_until: datetime | None = None
@@ -133,6 +134,7 @@ class ChargeWiseController:
         self._battery_recovery_since = None
         self._battery_protection_active = False
         self._battery_current_reduction_a = 0
+        self._battery_growth_since = None
         self._safety_paused = False
         self._cooldown_until = None
         self._solar_samples = []
@@ -318,8 +320,22 @@ class ChargeWiseController:
 
         if battery_discharge_w >= self.config.battery_recovery_w:
             self._battery_recovery_since = None
-            self._battery_current_reduction_a = ceil(battery_discharge_w / self.config.voltage_v)
+            wanted = ceil(battery_discharge_w / self.config.voltage_v)
+            if wanted <= self._battery_current_reduction_a:
+                self._battery_current_reduction_a = wanted
+                self._battery_growth_since = None
+            else:
+                if self._battery_growth_since is None:
+                    self._battery_growth_since = now
+                growth_deadline = self._battery_growth_since + timedelta(seconds=self.config.battery_confirmation_s)
+                if now >= growth_deadline:
+                    self._battery_current_reduction_a = wanted
+                    self._battery_growth_since = None
+                else:
+                    deadlines.append(growth_deadline)
             return deadlines
+
+        self._battery_growth_since = None
 
         if self._battery_recovery_since is None:
             self._battery_recovery_since = now
@@ -329,6 +345,7 @@ class ChargeWiseController:
         if now >= recovery_deadline and (self._cooldown_until is None or now >= self._cooldown_until):
             self._battery_protection_active = False
             self._battery_current_reduction_a = 0
+            self._battery_growth_since = None
             self._battery_recovery_since = None
             self._cooldown_until = None
         else:
