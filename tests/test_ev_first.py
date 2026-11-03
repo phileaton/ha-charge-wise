@@ -138,3 +138,26 @@ async def test_budget_sensors_publish_house_use_and_the_forecast_balance(
     assert house.attributes["unit_of_measurement"] == "kW"
     assert float(need.state) == pytest.approx(10.8)
     assert float(surplus.state) < 16
+
+
+async def test_ev_first_hold_state_is_restored_after_a_restart_on_the_same_day(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+) -> None:
+    """A restart keeps the release margin and the EV energy already added back."""
+    coordinator = ev_first_entry.runtime_data.coordinator
+    coordinator._ev_first_was_active = True  # noqa: SLF001
+    coordinator._ev_first_energy_kwh = 2.5  # noqa: SLF001
+    saved = coordinator._ev_first_as_dict()  # noqa: SLF001
+    coordinator._reset_ev_first()  # noqa: SLF001
+
+    coordinator._restore_ev_first(saved)  # noqa: SLF001
+
+    assert coordinator._ev_first_was_active  # noqa: SLF001
+    assert coordinator._ev_first_energy_kwh == 2.5  # noqa: SLF001
+
+    coordinator._reset_ev_first()  # noqa: SLF001
+    coordinator._restore_ev_first({**saved, "date": "2000-01-01"})  # noqa: SLF001
+
+    assert not coordinator._ev_first_was_active  # noqa: SLF001
+    assert coordinator._ev_first_energy_kwh == 0.0  # noqa: SLF001

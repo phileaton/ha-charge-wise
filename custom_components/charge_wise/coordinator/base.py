@@ -128,6 +128,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             float(self.options.get(CONF_HOUSE_LOAD_WINDOW_DAYS, DEFAULT_HOUSE_LOAD_WINDOW_DAYS)),
         )
         self._house_load_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.house_load")
+        self._ev_first_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.ev_first")
         self._timer_unsub: Any = None
         self._state_unsub: Any = None
         self._evaluation_lock = asyncio.Lock()
@@ -205,6 +206,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         if self.ev_first_config is not None:
             entity_ids.add("sun.sun")
             self.house_load.restore(await self._house_load_store.async_load())
+            self._restore_ev_first(await self._ev_first_store.async_load())
         self._state_unsub = async_track_state_change_event(
             self.hass,
             entity_ids,
@@ -220,6 +222,30 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self._cancel_timer()
         if self.ev_first_config is not None:
             await self._house_load_store.async_save(self.house_load.as_dict())
+            await self._ev_first_store.async_save(self._ev_first_as_dict())
+
+    def _ev_first_as_dict(self) -> dict[str, Any]:
+        """Return the EV-first hold state that must survive a restart."""
+        return {
+            "date": dt_util.now().date().isoformat(),
+            "was_active": self._ev_first_was_active,
+            "energy_kwh": self._ev_first_energy_kwh,
+        }
+
+    def _restore_ev_first(self, data: dict[str, Any] | None) -> None:
+        """Restore the hold state saved earlier today; older state belongs to a previous solar day."""
+        if not data or data.get("date") != dt_util.now().date().isoformat():
+            return
+        self._ev_first_was_active = bool(data.get("was_active", False))
+        try:
+            self._ev_first_energy_kwh = max(0.0, float(data.get("energy_kwh", 0.0)))
+        except TypeError, ValueError:
+            self._ev_first_energy_kwh = 0.0
+
+    def _reset_ev_first(self) -> None:
+        """Forget the EV-first hold state."""
+        self._ev_first_was_active = False
+        self._ev_first_energy_kwh = 0.0
 
     async def async_set_switch(self, key: SwitchKey, value: bool, *, restoring: bool = False) -> None:
         """Turn a charging source on or off; a restored source waits through the safety cooldown."""
@@ -228,6 +254,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 return
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="ev_first_not_configured")
         self.switches[key] = value
+        if not restoring and (key == "ev_first_enabled" or (key == "solar_enabled" and not value)):
+            self._reset_ev_first()
         if restoring and value:
             self.controller.start_cooldown(dt_util.utcnow())
         await self._async_evaluate()
@@ -284,7 +312,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self._accumulate_ev_first_energy(now)
         ev_first_result = self._ev_first_result(now)
         ev_first_active = self._ev_first_enabled() and ev_first_result is not None and ev_first_result.active
-        self._ev_first_was_active = ev_first_active
+        if self._ev_first_enabled():
+            self._ev_first_was_active = ev_first_active
+        self._ev_first_store.async_delay_save(self._ev_first_as_dict, _HOUSE_LOAD_SAVE_DELAY_S)
         readings = self._read_inputs(ev_first_active=ev_first_active)
         decision = self.controller.evaluate(settings, readings, now)
         self._log_decision_change(decision, readings)
@@ -409,10 +439,12 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Add the charger energy used since the last evaluation while EV-first was active."""
         last = self._ev_first_last_at
         self._ev_first_last_at = now
-        if not self._ev_first_enabled():
-            self._ev_first_energy_kwh = 0.0
-            return
-        if last is None or not self._ev_first_was_active or self.ev_first_config is None:
+        if (
+            not self._ev_first_enabled()
+            or last is None
+            or not self._ev_first_was_active
+            or self.ev_first_config is None
+        ):
             return
         power_w = self._power_w(self.options[CONF_CHARGER_POWER_ENTITY])
         if power_w is None:
@@ -447,7 +479,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         hours_until_sunset: float | None = None
         house_use_kwh: float | None = None
         instant_w = self._house_power_w()
-        if sun_state is None or sun_state.state != "above_horizon":
+        if sun_state is not None and sun_state.state != "above_horizon":
             self._ev_first_energy_kwh = 0.0
         if sun_state is not None and sun_state.state == "above_horizon":
             setting = dt_util.parse_datetime(str(sun_state.attributes.get("next_setting", "")))
