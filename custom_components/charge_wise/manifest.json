@@ -2,7 +2,8 @@
   "domain": "charge_wise",
   "name": "Charge Wise",
   "after_dependencies": [
-    "lovelace"
+    "lovelace",
+    "recorder"
   ],
   "codeowners": [
     "@phileaton"

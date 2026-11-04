@@ -1,9 +1,12 @@
 """Event-driven coordinator for Charge Wise."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import partial
 from math import isclose, isfinite
 from typing import TYPE_CHECKING, Any, Literal
+
+from sqlalchemy.exc import SQLAlchemyError
 
 from custom_components.charge_wise.const import (
     BATTERY_SIGN_NEGATIVE,
@@ -34,6 +37,7 @@ from custom_components.charge_wise.const import (
     CONF_OFFPEAK_WINDOWS,
     CONF_SETTLE_HOLD_S,
     CONF_SMOOTHING_WINDOW_S,
+    CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     CONF_SOLAR_START_W,
     CONF_VOLTAGE_V,
@@ -71,10 +75,12 @@ from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstI
 from custom_components.charge_wise.utils.forecast_accuracy import ForecastAccuracy
 from custom_components.charge_wise.utils.house_load import HouseLoadProfile
 from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
+from homeassistant.components.recorder.history import state_changes_during_period
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfEnergy
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.helpers.recorder import get_instance
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -202,13 +208,45 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self.house_load.restore(await self._house_load_store.async_load())
             stored = await self._ev_first_store.async_load()
             self._restore_ev_first(stored)
-            self.forecast_accuracy.restore((stored or {}).get("accuracy"), dt_util.now().date())
+            self.forecast_accuracy.restore(
+                (stored or {}).get("accuracy"),
+                dt_util.now().date(),
+                energy_counter=bool(self.options.get(CONF_SOLAR_ENERGY_ENTITY)),
+            )
+            await self._async_anchor_accuracy_to_midnight()
         self._state_unsub = async_track_state_change_event(
             self.hass,
             entity_ids,
             self._handle_state_change,
         )
         await self._async_evaluate()
+
+    async def _async_anchor_accuracy_to_midnight(self) -> None:
+        """Start today's accuracy from the energy counter's recorded value at midnight, when it is known."""
+        entity_id = self.options.get(CONF_SOLAR_ENERGY_ENTITY)
+        tracker = self.forecast_accuracy
+        if not entity_id or tracker.baseline_energy_kwh is not None or "recorder" not in self.hass.config.components:
+            return
+        midnight = dt_util.start_of_local_day()
+        try:
+            states = await get_instance(self.hass).async_add_executor_job(
+                partial(
+                    state_changes_during_period,
+                    self.hass,
+                    midnight,
+                    midnight + timedelta(minutes=1),
+                    entity_id,
+                    limit=1,
+                )
+            )
+        except HomeAssistantError, SQLAlchemyError:
+            LOGGER.debug("Could not read %s at midnight from the recorder", entity_id, exc_info=True)
+            return
+        first = (states.get(entity_id) or [None])[0]
+        if first is None or first.last_updated > midnight + timedelta(seconds=1):
+            return
+        if (energy_kwh := self._state_energy_kwh(first)) is not None:
+            tracker.anchor_to_day_start(midnight.date(), energy_kwh)
 
     async def async_stop(self) -> None:
         """Remove state and timer subscriptions."""
@@ -369,7 +407,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             battery_need_kwh=ev_first_result.battery_need_kwh if ev_first_result else None,
             forecast_surplus_kwh=ev_first_result.forecast_surplus_kwh if ev_first_result else None,
             forecast_accuracy_percent=self._accuracy_percent(),
-            forecast_accuracy_tracked_kwh=self.forecast_accuracy.tracked_forecast_kwh,
+            forecast_accuracy_actual_kwh=self.forecast_accuracy.actual_kwh,
+            forecast_accuracy_forecast_kwh=self.forecast_accuracy.tracked_forecast_kwh,
         )
 
     def _accuracy_percent(self) -> float | None:
@@ -444,6 +483,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             dt_util.as_local(now),
             self._power_w(self.options.get(CONF_SOLAR_POWER_ENTITY)),
             forecast_so_far,
+            self._energy_kwh(self.options.get(CONF_SOLAR_ENERGY_ENTITY)),
         )
 
     def _ev_first_config_from_options(self) -> EvFirstConfig | None:
@@ -502,7 +542,11 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Return a finite energy reading converted to kWh."""
         if entity_id is None:
             return None
-        state = self.hass.states.get(entity_id)
+        return self._state_energy_kwh(self.hass.states.get(entity_id))
+
+    @staticmethod
+    def _state_energy_kwh(state: State | None) -> float | None:
+        """Return a finite energy state converted to kWh."""
         if state is None:
             return None
         try:

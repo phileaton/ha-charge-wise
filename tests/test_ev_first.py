@@ -9,6 +9,8 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_CAPACITY_KWH,
     CONF_BATTERY_LEVEL_ENTITY,
     CONF_FORECAST_REMAINING_ENTITY,
+    CONF_FORECAST_TODAY_ENTITY,
+    CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     DOMAIN,
 )
@@ -168,7 +170,6 @@ async def test_measured_accuracy_scales_the_forecast_surplus(
     coordinator = ev_first_entry.runtime_data.coordinator
     accuracy_id = _entity_id(hass, ev_first_entry, "sensor", "forecast_accuracy")
     assert hass.states.get(accuracy_id).state == "unknown"
-    assert hass.states.get(accuracy_id).attributes["tracking_progress"] == "0.0 of 2 kWh"
 
     today = dt_util.now().date()
     coordinator.forecast_accuracy.restore(
@@ -184,3 +185,38 @@ async def test_measured_accuracy_scales_the_forecast_surplus(
     await hass.async_block_till_done()
 
     assert float(hass.states.get(accuracy_id).state) == pytest.approx(50)
+    assert hass.states.get(accuracy_id).attributes["actual_vs_forecast"] == "5.0 of 10.0 kWh"
+
+
+async def test_energy_counter_drives_the_forecast_accuracy(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
+    """The configured energy counter's growth is compared with the forecast so far."""
+    hass.states.async_set("sensor.forecast_remaining", "20", {"unit_of_measurement": "kWh"})
+    hass.states.async_set("sensor.forecast_total", "20", {"unit_of_measurement": "kWh"})
+    hass.states.async_set("sensor.solar_total", "100", {"unit_of_measurement": "kWh"})
+    hass.states.async_set("sensor.battery_level", "50", {"unit_of_measurement": "%"})
+    hass.states.async_set("sensor.solar_production", "500", {"unit_of_measurement": "W"})
+    _set_sun(hass, 6)
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={
+            **config_entry.options,
+            CONF_FORECAST_REMAINING_ENTITY: "sensor.forecast_remaining",
+            CONF_FORECAST_TODAY_ENTITY: "sensor.forecast_total",
+            CONF_SOLAR_ENERGY_ENTITY: "sensor.solar_total",
+            CONF_BATTERY_LEVEL_ENTITY: "sensor.battery_level",
+            CONF_SOLAR_POWER_ENTITY: "sensor.solar_production",
+            CONF_BATTERY_CAPACITY_KWH: 27,
+        },
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    accuracy_id = _entity_id(hass, config_entry, "sensor", "forecast_accuracy")
+
+    hass.states.async_set("sensor.forecast_remaining", "16", {"unit_of_measurement": "kWh"})
+    hass.states.async_set("sensor.solar_total", "103", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+    await config_entry.runtime_data.coordinator._async_evaluate()  # noqa: SLF001
+    await hass.async_block_till_done()
+
+    assert float(hass.states.get(accuracy_id).state) == pytest.approx(75)

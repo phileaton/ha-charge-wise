@@ -20,6 +20,7 @@ from custom_components.charge_wise.const import (
     CONF_HARDWARE_MAXIMUM_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
+    CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     DOMAIN,
 )
@@ -42,6 +43,7 @@ _FORECAST_OPTIONAL_DOMAINS = {
     CONF_FORECAST_TODAY_ENTITY: "sensor",
     CONF_BATTERY_LEVEL_ENTITY: "sensor",
     CONF_SOLAR_POWER_ENTITY: "sensor",
+    CONF_SOLAR_ENERGY_ENTITY: "sensor",
 }
 _EV_FIRST_KEYS = (
     CONF_FORECAST_REMAINING_ENTITY,
@@ -167,7 +169,7 @@ def validate_forecast(
     if errors := _validate_power_units(hass, user_input, (CONF_SOLAR_POWER_ENTITY,)):
         return errors
 
-    for key in (CONF_FORECAST_REMAINING_ENTITY, CONF_FORECAST_TODAY_ENTITY):
+    for key in (CONF_FORECAST_REMAINING_ENTITY, CONF_FORECAST_TODAY_ENTITY, CONF_SOLAR_ENERGY_ENTITY):
         forecast_entity = user_input.get(key)
         if forecast_entity:
             forecast_state = hass.states.get(forecast_entity)

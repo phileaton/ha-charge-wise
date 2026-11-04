@@ -36,6 +36,7 @@ from custom_components.charge_wise.const import (
     CONF_MINIMUM_CURRENT_A,
     CONF_SETTLE_HOLD_S,
     CONF_SMOOTHING_WINDOW_S,
+    CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     CONF_SOLAR_START_W,
     CONF_VOLTAGE_V,
@@ -140,6 +141,7 @@ def forecast_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
         probatio.Optional(CONF_FORECAST_TODAY_ENTITY): _SENSOR_SELECTOR,
         probatio.Optional(CONF_BATTERY_LEVEL_ENTITY): _SENSOR_SELECTOR,
         probatio.Optional(CONF_SOLAR_POWER_ENTITY): _SENSOR_SELECTOR,
+        probatio.Optional(CONF_SOLAR_ENERGY_ENTITY): _SENSOR_SELECTOR,
         probatio.Optional(CONF_BATTERY_CAPACITY_KWH): selector.NumberSelector(
             selector.NumberSelectorConfig(
                 min=1,

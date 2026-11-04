@@ -2,7 +2,6 @@
 
 from custom_components.charge_wise.sensor.entity import ChargeWiseSensorEntityDescription
 from custom_components.charge_wise.utils.charging_controller import ChargeWiseReason, ControllerStatus
-from custom_components.charge_wise.utils.forecast_accuracy import MIN_FORECAST_KWH
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower
 
@@ -71,7 +70,7 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         suggested_display_precision=0,
         value_fn=lambda data: data.forecast_accuracy_percent,
         attributes_fn=lambda data: {
-            "tracking_progress": f"{data.forecast_accuracy_tracked_kwh or 0:.1f} of {MIN_FORECAST_KWH:g} kWh"
+            "actual_vs_forecast": f"{data.forecast_accuracy_actual_kwh or 0:.1f} of {data.forecast_accuracy_forecast_kwh or 0:.1f} kWh"
         },
     ),
     ChargeWiseSensorEntityDescription(

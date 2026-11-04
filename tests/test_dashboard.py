@@ -83,7 +83,7 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert "sensor.test_charger_available_solar_budget" in entities
     assert "sensor.test_charger_forecast_accuracy" in entities
     accuracy_tile = next(card for card in cards if card.get("entity") == "sensor.test_charger_forecast_accuracy")
-    assert accuracy_tile["state_content"] == ["state", "tracking_progress"]
+    assert accuracy_tile["state_content"] == ["state", "actual_vs_forecast"]
     assert any(card["type"] == "gauge" for card in cards)
     assert any(card["type"] == "history-graph" for card in cards)
     chart = next(card for card in cards if card["type"] == "custom:apexcharts-card")

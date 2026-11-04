@@ -108,3 +108,63 @@ def test_restore_discards_state_whose_forecast_is_behind_its_baseline() -> None:
 
     assert tracker.baseline_forecast_kwh is None
     assert tracker.actual_kwh == 0.0
+
+
+def test_energy_counter_replaces_power_integration() -> None:
+    """With an energy counter, production is the counter's growth and the power reading is ignored."""
+    tracker = ForecastAccuracy()
+    for step in range(61):
+        tracker.observe(START + timedelta(minutes=step), 9999, 4.0 * step / 60, 100.0 + 3.0 * step / 60)
+
+    assert tracker.actual_kwh == 3.0
+    assert tracker.ratio == 0.75
+
+
+def test_anchoring_to_midnight_counts_the_whole_day_so_far() -> None:
+    """A midnight counter value makes the comparison cover everything since midnight, not since startup."""
+    tracker = ForecastAccuracy()
+    tracker.anchor_to_day_start(START.date(), 100.0)
+
+    tracker.observe(START, None, 6.0, 105.0)
+
+    assert tracker.tracked_forecast_kwh == 6.0
+    assert tracker.ratio is not None
+    assert round(tracker.ratio, 3) == 0.833
+
+
+def test_counter_downtime_does_not_lose_production() -> None:
+    """The counter keeps counting while Home Assistant is down, and the forecast baseline stays put."""
+    tracker = ForecastAccuracy()
+    tracker.anchor_to_day_start(START.date(), 100.0)
+    tracker.observe(START, None, 2.0, 102.0)
+    saved = tracker.as_dict()
+
+    restarted = ForecastAccuracy()
+    restarted.restore(saved, START.date(), energy_counter=True)
+    restarted.observe(START + timedelta(hours=3), None, 8.0, 108.0)
+
+    assert restarted.ratio == 1.0
+
+
+def test_a_counter_reset_restarts_the_comparison() -> None:
+    """A counter that drops has been reset or replaced, so earlier readings no longer apply."""
+    tracker = ForecastAccuracy()
+    tracker.anchor_to_day_start(START.date(), 500.0)
+    tracker.observe(START, None, 4.0, 504.0)
+
+    tracker.observe(START + timedelta(minutes=5), None, 4.5, 0.2)
+
+    assert tracker.baseline_energy_kwh == 0.2
+    assert tracker.baseline_forecast_kwh == 4.5
+    assert tracker.actual_kwh == 0.0
+
+
+def test_restore_drops_state_from_a_different_production_source() -> None:
+    """Switching between the power sensor and the energy counter starts the comparison over."""
+    power = ForecastAccuracy()
+    _run(power, 30, 4000, 0.0, 2.0)
+
+    switched = ForecastAccuracy()
+    switched.restore(power.as_dict(), START.date(), energy_counter=True)
+
+    assert switched.baseline_forecast_kwh is None
