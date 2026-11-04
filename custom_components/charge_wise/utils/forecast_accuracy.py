@@ -8,6 +8,7 @@ MIN_FORECAST_KWH = 2.0
 MIN_RATIO = 0.3
 MAX_RATIO = 1.2
 MAX_ELAPSED_S = 300
+REVISION_TOLERANCE_KWH = 0.05
 
 
 @dataclass
@@ -33,17 +34,29 @@ class ForecastAccuracy:
             return
         if self.baseline_forecast_kwh is None:
             self.baseline_forecast_kwh = forecast_so_far_kwh
+        elif forecast_so_far_kwh < self.latest_forecast_kwh - REVISION_TOLERANCE_KWH:
+            self.baseline_forecast_kwh = forecast_so_far_kwh
+            self.actual_kwh = 0.0
+        elif last_at is None or (now - last_at).total_seconds() > MAX_ELAPSED_S:
+            self.baseline_forecast_kwh += max(0.0, forecast_so_far_kwh - self.latest_forecast_kwh)
         self.latest_forecast_kwh = forecast_so_far_kwh
         if last_at is not None and solar_w is not None:
             elapsed_s = min((now - last_at).total_seconds(), MAX_ELAPSED_S)
             self.actual_kwh += max(0.0, solar_w) * max(0.0, elapsed_s) / 3_600_000
 
     @property
+    def tracked_forecast_kwh(self) -> float:
+        """Return the forecast energy that has passed while production was being measured."""
+        if self.baseline_forecast_kwh is None:
+            return 0.0
+        return max(0.0, self.latest_forecast_kwh - self.baseline_forecast_kwh)
+
+    @property
     def ratio(self) -> float | None:
         """Return actual ÷ forecast clamped to a sane range, or None until enough forecast energy has passed."""
         if self.baseline_forecast_kwh is None:
             return None
-        forecast_kwh = self.latest_forecast_kwh - self.baseline_forecast_kwh
+        forecast_kwh = self.tracked_forecast_kwh
         if forecast_kwh < MIN_FORECAST_KWH:
             return None
         return min(MAX_RATIO, max(MIN_RATIO, self.actual_kwh / forecast_kwh))

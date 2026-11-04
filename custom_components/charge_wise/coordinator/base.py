@@ -369,6 +369,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             battery_need_kwh=ev_first_result.battery_need_kwh if ev_first_result else None,
             forecast_surplus_kwh=ev_first_result.forecast_surplus_kwh if ev_first_result else None,
             forecast_accuracy_percent=self._accuracy_percent(),
+            forecast_accuracy_tracked_kwh=self.forecast_accuracy.tracked_forecast_kwh,
         )
 
     def _accuracy_percent(self) -> float | None:

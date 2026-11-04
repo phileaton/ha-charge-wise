@@ -168,6 +168,7 @@ async def test_measured_accuracy_scales_the_forecast_surplus(
     coordinator = ev_first_entry.runtime_data.coordinator
     accuracy_id = _entity_id(hass, ev_first_entry, "sensor", "forecast_accuracy")
     assert hass.states.get(accuracy_id).state == "unknown"
+    assert hass.states.get(accuracy_id).attributes["tracking_progress"] == "0.0 of 2 kWh"
 
     today = dt_util.now().date()
     coordinator.forecast_accuracy.restore(

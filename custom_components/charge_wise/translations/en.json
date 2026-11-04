@@ -369,7 +369,12 @@
         "name": "Forecast surplus after house use"
       },
       "forecast_accuracy": {
-        "name": "Forecast accuracy"
+        "name": "Forecast accuracy",
+        "state_attributes": {
+          "tracking_progress": {
+            "name": "Tracking progress"
+          }
+        }
       }
     },
     "binary_sensor": {

@@ -66,3 +66,33 @@ def test_state_round_trips_only_within_the_same_day() -> None:
 
     assert same_day.ratio == tracker.ratio
     assert next_day.ratio is None
+
+
+def test_downtime_is_left_out_of_the_comparison() -> None:
+    """Forecast that passed while Home Assistant was down must not count against the panels."""
+    tracker = ForecastAccuracy()
+    _run(tracker, 60, 4000, 0.0, 4.0)
+    saved = tracker.as_dict()
+
+    restarted = ForecastAccuracy()
+    restarted.restore(saved, START.date())
+    resume = START + timedelta(hours=3)
+    restarted.observe(resume, 4000, 10.0)
+    for step in range(1, 61):
+        restarted.observe(resume + timedelta(minutes=step), 4000, 10.0 + 4.0 * step / 60)
+
+    assert restarted.ratio is not None
+    assert round(restarted.ratio, 2) == 1.0
+    assert round(restarted.tracked_forecast_kwh, 1) == 8.0
+
+
+def test_a_downward_forecast_revision_restarts_the_measurement() -> None:
+    """When the forecast so far drops, the old comparison is meaningless and starts over."""
+    tracker = ForecastAccuracy()
+    _run(tracker, 60, 4000, 8.0, 12.0)
+
+    tracker.observe(START + timedelta(minutes=61), 4000, 7.0)
+
+    assert tracker.baseline_forecast_kwh == 7.0
+    assert tracker.actual_kwh < 0.1
+    assert tracker.ratio is None

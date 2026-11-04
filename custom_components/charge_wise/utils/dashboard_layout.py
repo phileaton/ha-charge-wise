@@ -211,9 +211,10 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
     )
     for key, name, color in tiles:
         if key in ids:
-            cards.append(
-                _tile(ids[key], name, color, trend=key in {"house_load", "forecast_surplus", "forecast_accuracy"})
-            )
+            card = _tile(ids[key], name, color, trend=key in {"house_load", "forecast_surplus", "forecast_accuracy"})
+            if key == "forecast_accuracy":
+                card["state_content"] = ["state", "tracking_progress"]
+            cards.append(card)
     if "battery_need" in ids and "forecast_surplus" in ids:
         cards.append(_budget_summary(ids))
     if "next_offpeak_window" in ids:
