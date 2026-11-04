@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# script/export-scenario: Export recorder history as replayable test scenarios
+#
+# Reads solar, grid, battery, charger and forecast history for the given local
+# days from the development recorder database and writes one fixture per day to
+# tests/scenarios/data/. Run it before the recorder purges the days you want.
+#
+# Usage:
+#   ./script/export-scenario DATE [DATE ...] [OPTIONS]
+#
+# Examples:
+#   ./script/export-scenario 2026-11-03
+#   ./script/export-scenario 2026-11-02 2026-11-03 --timezone America/Los_Angeles
+#   ./script/export-scenario --help
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+# shellcheck source=script/.lib/output.sh
+source "$SCRIPT_DIR/.lib/output.sh"
+
+activate_venv
+
+python -m tests.scenarios.export "$@"

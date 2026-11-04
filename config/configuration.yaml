@@ -68,7 +68,7 @@ my:
 recorder:
   # Development-friendly database settings
   # Reduce database size and improve performance
-  purge_keep_days: 2
+  purge_keep_days: 14
   commit_interval: 30
   # Exclude entities you don't need history for
   exclude:
