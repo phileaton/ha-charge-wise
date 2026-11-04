@@ -80,8 +80,15 @@ class ForecastAccuracy:
             self.latest_forecast_kwh = float(data.get("latest_forecast_kwh", 0.0))
             self.actual_kwh = max(0.0, float(data.get("actual_kwh", 0.0)))
         except TypeError, ValueError:
-            self.baseline_forecast_kwh = None
-            self.latest_forecast_kwh = 0.0
-            self.actual_kwh = 0.0
+            self._clear()
+            return
+        if self.baseline_forecast_kwh is not None and self.latest_forecast_kwh < self.baseline_forecast_kwh:
+            self._clear()
             return
         self.day = today
+
+    def _clear(self) -> None:
+        """Forget the measurement."""
+        self.baseline_forecast_kwh = None
+        self.latest_forecast_kwh = 0.0
+        self.actual_kwh = 0.0

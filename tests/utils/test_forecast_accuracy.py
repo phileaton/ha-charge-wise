@@ -96,3 +96,15 @@ def test_a_downward_forecast_revision_restarts_the_measurement() -> None:
     assert tracker.baseline_forecast_kwh == 7.0
     assert tracker.actual_kwh < 0.1
     assert tracker.ratio is None
+
+
+def test_restore_discards_state_whose_forecast_is_behind_its_baseline() -> None:
+    """Saved production without matching forecast progress would inflate the ratio, so it is dropped."""
+    tracker = ForecastAccuracy()
+    tracker.restore(
+        {"day": START.date().isoformat(), "baseline_forecast_kwh": 8.5, "latest_forecast_kwh": 6.7, "actual_kwh": 6.7},
+        START.date(),
+    )
+
+    assert tracker.baseline_forecast_kwh is None
+    assert tracker.actual_kwh == 0.0
