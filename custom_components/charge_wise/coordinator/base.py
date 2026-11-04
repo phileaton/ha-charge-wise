@@ -397,7 +397,11 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             next_offpeak_start=next_offpeak_start,
             status=status or decision.status,
             reason=reason or decision.reason,
-            available_solar_w=decision.available_solar_w,
+            available_solar_w=(
+                decision.available_solar_w
+                if decision.available_solar_w is not None
+                else self._available_solar_budget_w(ev_first_active)
+            ),
             requested_current_a=decision.requested_current_a if requested_current_a is None else requested_current_a,
             manual_current_a=self.manual_current_a,
             offpeak_current_a=self.offpeak_current_a,
@@ -442,6 +446,21 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         if production is None or grid is None or charger is None or battery is None:
             return None
         return max(0.0, production + grid + battery - charger)
+
+    def _available_solar_budget_w(self, ev_first_active: bool) -> float | None:
+        """Return the live solar budget even when no Solar charging decision is active."""
+        grid = self._power_w(self.options[CONF_GRID_POWER_ENTITY])
+        charger = self._power_w(self.options[CONF_CHARGER_POWER_ENTITY])
+        if grid is None or charger is None:
+            return None
+
+        ev_first_boost_w = 0.0
+        if ev_first_active:
+            battery = self._battery_discharge_w()
+            if battery is None:
+                return None
+            ev_first_boost_w = max(0.0, -battery)
+        return max(0.0, charger - grid + ev_first_boost_w)
 
     def _read_inputs(self, *, ev_first_active: bool = False) -> ControllerInput:
         """Read and normalize the currently configured Home Assistant entities."""

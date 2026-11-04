@@ -59,7 +59,7 @@ async def test_setup_exposes_the_charge_wise_control_surface(
     assert hass.states.get(offpeak_active).state == "off"
     assert float(hass.states.get(number_entity).state) == 32
     assert hass.states.get(status_entity).state == "off"
-    assert hass.states.get(solar_entity).state == "unknown"
+    assert float(hass.states.get(solar_entity).state) == 0
     assert float(hass.states.get(current_entity).state) == 0
     assert hass.states.get(reason_entity).state == "off"
     assert hass.states.get(battery_entity).state == "off"
@@ -106,6 +106,21 @@ async def test_solar_budget_uses_charger_power_and_signed_grid_power(
     status_entity = _entity_id(hass, init_integration, "sensor", "controller_status")
     assert float(hass.states.get(solar_entity).state) == 1.0
     assert hass.states.get(status_entity).state == "waiting"
+
+
+async def test_solar_budget_stays_available_when_charge_wise_is_disabled(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """The live solar budget remains visible in the dashboard while control is disabled."""
+    _set_power(hass, "sensor.grid_power", -1.25, "kW")
+    _set_power(hass, "sensor.charger_power", 0)
+    await hass.async_block_till_done()
+
+    solar_entity = _entity_id(hass, init_integration, "sensor", "available_solar_budget")
+    enabled_entity = _entity_id(hass, init_integration, "switch", "enabled")
+    assert hass.states.get(enabled_entity).state == "off"
+    assert float(hass.states.get(solar_entity).state) == 1.25
 
 
 async def test_battery_protection_entity_is_omitted_without_a_battery_sensor(
