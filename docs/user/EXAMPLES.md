@@ -47,8 +47,11 @@ Charge Wise does not compare tariffs or electricity prices; the windows are fixe
 ## Dashboard
 
 The last setup page has a **Create a dashboard** option, on by default. It adds a sidebar dashboard named after your
-charger, built from standard Home Assistant cards and your real entities. Charge Wise refreshes it each time the
-integration loads, so edits you make to it are overwritten; copy it into a dashboard of your own to customise it.
+charger, built from your real entities. Its solar forecast chart uses the community
+[ApexCharts Card](https://github.com/RomRider/apexcharts-card); install it through HACS and add its Lovelace resource
+if you configure both a forecast sensor and solar production. For the forecast curve, enable **Half-hourly detail** in
+the Solcast Solar integration. Charge Wise refreshes the dashboard each time the integration loads, so edits you make
+to it are overwritten; copy it into a dashboard of your own to customise it.
 Untick the option in the integration's options, or delete the integration, to remove the dashboard.
 
 Entries set up before this option existed do not get a dashboard until you tick it in their options.

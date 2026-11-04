@@ -1,4 +1,4 @@
-"""Lay out the generated dashboard from core cards only, so it needs no frontend add-ons."""
+"""Lay out the generated dashboard."""
 
 from collections.abc import Mapping
 from typing import Any
@@ -249,13 +249,62 @@ def _budget_summary(ids: Mapping[str, str]) -> Card:
     return {"type": "markdown", "title": "Forecast balance", "content": content, "grid_options": {"columns": 12}}
 
 
-def _solar_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[Card]:
-    """Return solar forecast tiles and a day-long history of the power flows."""
+def _solar_forecast_graph(forecast_entity: str, solar_entity: str, solar_power_scale_to_kw: float) -> Card:
+    """Return the forecast-versus-actual solar power graph."""
+    return {
+        "type": "custom:apexcharts-card",
+        "header": {"show": True, "title": "Solar power: forecast vs actual (kW)"},
+        "graph_span": "24h",
+        "span": {"start": "day"},
+        "now": {"show": True, "label": "Now"},
+        "series": [
+            {
+                "entity": forecast_entity,
+                "name": "Forecast",
+                "type": "area",
+                "color": _AMBER,
+                "data_generator": (
+                    "return (entity.attributes.detailedForecast || [])"
+                    ".map(point => [Date.parse(point.period_start), point.pv_estimate])"
+                    ".filter(([timestamp, value]) => Number.isFinite(timestamp) && value != null && Number.isFinite(Number(value)))"
+                    ".map(([timestamp, value]) => [timestamp, Number(value)]);"
+                ),
+            },
+            {
+                "entity": solar_entity,
+                "name": "Actual",
+                "type": "line",
+                "color": _GREEN,
+                "transform": f"return x * {solar_power_scale_to_kw:g};",
+                "group_by": {"duration": "30min", "func": "avg"},
+            },
+        ],
+        "grid_options": {"columns": 12},
+    }
+
+
+def _solar_section(
+    ids: Mapping[str, str],
+    options: Mapping[str, Any],
+    solar_power_scale_to_kw: float | None,
+) -> list[Card]:
+    """Return solar forecast tiles and the history of the power flows."""
     cards = [_heading("Solar and history", "mdi:solar-power-variant")]
     if forecast := options.get(CONF_FORECAST_REMAINING_ENTITY):
-        cards.append(_tile(forecast, "Forecast remaining today", "orange", columns=12))
+        cards.append(_tile(forecast, "Forecast energy remaining today (kWh)", "orange", trend=False, columns=12))
     if forecast_today := options.get(CONF_FORECAST_TODAY_ENTITY):
-        cards.append(_tile(forecast_today, "Forecast total today", "orange", columns=12))
+        cards.append(_tile(forecast_today, "Forecast energy total today (kWh)", "orange", trend=False, columns=12))
+        if solar := options.get(CONF_SOLAR_POWER_ENTITY):
+            if solar_power_scale_to_kw is None:
+                cards.append(
+                    {
+                        "type": "markdown",
+                        "content": "The forecast comparison chart needs a solar power sensor with a unit of mW, W, or kW.",
+                        "grid_options": {"columns": 12},
+                    },
+                )
+            else:
+                cards.append(_solar_forecast_graph(forecast_today, solar, solar_power_scale_to_kw))
     power = [
         entity
         for entity in (
@@ -301,6 +350,7 @@ def build_view(
     control_keys: tuple[str, ...],
     *,
     budget_in_kw: bool = True,
+    solar_power_scale_to_kw: float | None = None,
 ) -> Card:
     """Build the dashboard view from the entity IDs this entry registered and its configured source entities.
 
@@ -310,7 +360,7 @@ def build_view(
         _live_section(ids, options),
         _battery_and_ev_section(ids, options, 1000 if budget_in_kw else 1),
         _budget_section(ids, options),
-        _solar_section(ids, options),
+        _solar_section(ids, options, solar_power_scale_to_kw),
         _controls_section(ids, control_keys, title),
     ]
     return {

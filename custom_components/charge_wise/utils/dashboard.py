@@ -8,7 +8,7 @@ restores one that the dashboard editor dropped from its own records.
 import logging
 from typing import Any
 
-from custom_components.charge_wise.const import DOMAIN
+from custom_components.charge_wise.const import CONF_SOLAR_POWER_ENTITY, DOMAIN, POWER_TO_W
 from custom_components.charge_wise.utils.dashboard_layout import build_view
 from homeassistant.components import frontend
 from homeassistant.components.lovelace.const import LOVELACE_DATA
@@ -70,6 +70,20 @@ def _budget_in_kw(hass: HomeAssistant, entity_id: str | None) -> bool:
     return registry_entry is None or registry_entry.unit_of_measurement in (None, "kW")
 
 
+def _power_scale_to_kw(hass: HomeAssistant, entity_id: str | None) -> float | None:
+    """Return the conversion from a power sensor's native unit to kW, if it is known."""
+    if entity_id is None:
+        return None
+    state = hass.states.get(entity_id)
+    unit = state.attributes.get("unit_of_measurement") if state is not None else None
+    if unit is None:
+        registry_entry = er.async_get(hass).async_get(entity_id)
+        unit = registry_entry.unit_of_measurement if registry_entry is not None else None
+    if not isinstance(unit, str) or (factor := POWER_TO_W.get(unit)) is None:
+        return None
+    return factor / 1000
+
+
 def build_config(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Build the dashboard from the entities this entry registered."""
     ids = _entity_ids(hass, entry)
@@ -79,6 +93,7 @@ def build_config(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
         entry.options,
         tuple(key for _, key in _CONTROLS),
         budget_in_kw=_budget_in_kw(hass, ids.get("available_solar_budget")),
+        solar_power_scale_to_kw=_power_scale_to_kw(hass, entry.options.get(CONF_SOLAR_POWER_ENTITY)),
     )
     return {"views": [view]}
 

@@ -55,6 +55,7 @@ from custom_components.charge_wise.const import (
     DEFAULT_VOLTAGE_V,
     DOMAIN,
     LOGGER,
+    POWER_TO_W,
 )
 from custom_components.charge_wise.coordinator.data import ChargeWiseSnapshot
 from custom_components.charge_wise.utils.charging_controller import (
@@ -70,7 +71,7 @@ from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstI
 from custom_components.charge_wise.utils.forecast_accuracy import ForecastAccuracy
 from custom_components.charge_wise.utils.house_load import HouseLoadProfile
 from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
-from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower
+from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfEnergy
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
@@ -82,13 +83,6 @@ if TYPE_CHECKING:
     from custom_components.charge_wise.data import ChargeWiseConfigEntry
 
 _HOUSE_LOAD_SAVE_DELAY_S = 300
-
-_POWER_FACTORS: dict[str, float] = {
-    UnitOfPower.MILLIWATT: 0.001,
-    UnitOfPower.WATT: 1.0,
-    UnitOfPower.KILO_WATT: 1000.0,
-}
-
 
 _ENERGY_FACTORS_KWH: dict[str, float] = {
     UnitOfEnergy.WATT_HOUR: 0.001,
@@ -533,7 +527,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
         if not isinstance(unit, str):
             return None
-        factor = _POWER_FACTORS.get(unit)
+        factor = POWER_TO_W.get(unit)
         if factor is None or not isfinite(value):
             return None
         return value * factor

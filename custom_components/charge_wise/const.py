@@ -39,6 +39,8 @@ CONF_EV_FIRST_RELEASE_MARGIN_PERCENT = "ev_first_release_margin_percent"
 CONF_HOUSE_LOAD_WINDOW_DAYS = "house_load_window_days"
 CONF_CREATE_DASHBOARD = "create_dashboard"
 
+POWER_TO_W = {"mW": 0.001, "W": 1.0, "kW": 1000.0}
+
 BATTERY_SIGN_POSITIVE = "positive"
 BATTERY_SIGN_NEGATIVE = "negative"
 
