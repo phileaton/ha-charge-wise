@@ -52,6 +52,7 @@ class DayResult:
     starts: int = 0
     stops: int = 0
     ev_kwh: float = 0.0
+    ev_grid_kwh: float = 0.0
     charging_minutes: float = 0.0
     ev_first_minutes: float = 0.0
     solar_kwh: float = 0.0
@@ -184,6 +185,7 @@ def _replay_day(
         if charger_enabled:
             result.charging_minutes += seconds / 60
             result.ev_kwh += current_a * controller_config.voltage_v * seconds / 3_600_000
+            result.ev_grid_kwh += min(charger_w, max(0.0, simulated_grid)) * seconds / 3_600_000
             paused_with_budget_s = 0.0
         elif (decision.available_solar_w or 0) >= controller_config.solar_start_w:
             paused_with_budget_s += seconds
