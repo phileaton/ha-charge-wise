@@ -470,6 +470,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             current_target_a=self._number_value(self.options[CONF_CURRENT_TARGET_ENTITY]),
             hardware_maximum_a=self._number_value(self.options.get(CONF_HARDWARE_MAXIMUM_ENTITY)),
             ev_first_boost_w=ev_first_boost_w,
+            ev_first_blocked=self._ev_first_enabled() and not ev_first_active,
         )
 
     def _observe_forecast_accuracy(self, now: datetime) -> None:

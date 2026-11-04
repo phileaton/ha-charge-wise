@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from freezegun.api import FrozenDateTimeFactory
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -14,7 +15,7 @@ from custom_components.charge_wise.const import (
     CONF_SOLAR_POWER_ENTITY,
     DOMAIN,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
@@ -86,6 +87,62 @@ async def test_ev_first_adds_battery_charge_power_to_the_solar_budget(
 
     assert hass.states.get(active).state == "off"
     assert float(hass.states.get(budget).state) == 0
+
+
+async def test_ev_first_forecast_shortfall_stops_solar_charging(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Solar-mode charging pauses when the forecast cannot cover the battery need."""
+    watts = {"unit_of_measurement": "W"}
+    hass.states.async_set("sensor.grid_power", "-7200", watts)
+    await hass.async_block_till_done()
+    await _turn_on(hass, ev_first_entry, "enabled", "ev_first_enabled", "solar_enabled")
+
+    async def set_current(call: ServiceCall) -> None:
+        hass.states.async_set(
+            call.data["entity_id"],
+            str(call.data["value"]),
+            {"unit_of_measurement": "A"},
+        )
+
+    async def turn_on(call: ServiceCall) -> None:
+        hass.states.async_set(call.data["entity_id"], "on")
+
+    async def turn_off(call: ServiceCall) -> None:
+        hass.states.async_set(call.data["entity_id"], "off")
+
+    hass.services.async_register("number", "set_value", set_current)
+    hass.services.async_register("switch", "turn_on", turn_on)
+    hass.services.async_register("switch", "turn_off", turn_off)
+    freezer.tick(31)
+    await ev_first_entry.runtime_data.coordinator._async_evaluate()  # noqa: SLF001
+    await hass.async_block_till_done()
+
+    charger = hass.states.get("switch.charger_enable")
+    assert charger is not None
+    assert charger.state == "on"
+
+    hass.states.async_set("sensor.forecast_remaining", "9.5", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+
+    active = hass.states.get(_entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active"))
+    charger = hass.states.get("switch.charger_enable")
+    assert active is not None
+    assert active.state == "on"
+    assert charger is not None
+    assert charger.state == "on"
+
+    hass.states.async_set("sensor.forecast_remaining", "5", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+
+    reason = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "decision_reason"))
+    charger = hass.states.get("switch.charger_enable")
+    assert reason is not None
+    assert reason.state == "ev_first_waiting"
+    assert charger is not None
+    assert charger.state == "off"
 
 
 async def test_ev_first_switch_is_refused_without_forecast_inputs(

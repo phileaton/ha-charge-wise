@@ -29,6 +29,7 @@ def _readings(
     current_target_a: float | None = 6,
     hardware_maximum_a: float | None = 32,
     ev_first_boost_w: float = 0.0,
+    ev_first_blocked: bool = False,
 ) -> ControllerInput:
     """Build a normal controller input with selected safety sensors."""
     return ControllerInput(
@@ -42,6 +43,7 @@ def _readings(
         current_target_a=current_target_a,
         hardware_maximum_a=hardware_maximum_a,
         ev_first_boost_w=ev_first_boost_w,
+        ev_first_blocked=ev_first_blocked,
     )
 
 
@@ -196,6 +198,35 @@ def test_battery_recovery_waits_for_confirmation_and_cooldown() -> None:
     assert not recovered.battery_protection_active
 
 
+def test_battery_protection_recovers_when_recovery_threshold_is_zero() -> None:
+    """Zero battery discharge starts recovery instead of keeping protection latched."""
+    controller = ChargeWiseController(ControllerConfig(battery_recovery_w=0))
+    high = _readings(
+        grid_power_w=0,
+        charger_power_w=3000,
+        battery_discharge_w=600,
+        charger_enabled=True,
+        current_target_a=12,
+    )
+    controller.evaluate(SOLAR, high, START)
+    controller.evaluate(SOLAR, high, START + timedelta(seconds=90))
+    low = _readings(
+        grid_power_w=0,
+        charger_power_w=3000,
+        battery_discharge_w=0,
+        charger_enabled=True,
+        current_target_a=9,
+    )
+
+    recovering = controller.evaluate(SOLAR, low, START + timedelta(seconds=181))
+    recovered = controller.evaluate(SOLAR, low, START + timedelta(seconds=271))
+
+    assert recovering.reason is ChargeWiseReason.BATTERY_RECOVERY
+    assert recovering.battery_protection_active
+    assert recovered.reason is ChargeWiseReason.SOLAR_CHARGING
+    assert not recovered.battery_protection_active
+
+
 def test_invalid_configured_battery_reading_pauses_solar() -> None:
     """A missing configured battery reading cannot silently disable protection."""
     decision = ChargeWiseController(ControllerConfig()).evaluate(
@@ -240,6 +271,7 @@ def test_manual_override_respects_hardware_ceiling() -> None:
             hardware_maximum_a=16,
             grid_power_w=None,
             charger_power_w=None,
+            ev_first_blocked=True,
         ),
         START,
     )
@@ -265,7 +297,7 @@ def test_offpeak_window_charges_from_the_grid_without_solar() -> None:
     """An active window charges at the off-peak current even with no surplus."""
     decision = ChargeWiseController(ControllerConfig()).evaluate(
         _offpeak(),
-        _readings(grid_power_w=3000, charger_power_w=0),
+        _readings(grid_power_w=3000, charger_power_w=0, ev_first_blocked=True),
         START,
     )
 
@@ -372,6 +404,21 @@ def test_ev_first_boost_adds_battery_charge_power_to_the_solar_budget() -> None:
     assert boosted.requested_current_a == 17
     assert boosted.reason is ChargeWiseReason.EV_FIRST
     assert boosted.available_solar_w == 4200
+
+
+def test_ev_first_forecast_gate_pauses_solar_charging() -> None:
+    """The EV waits when forecast surplus cannot cover the battery's remaining need."""
+    decision = ChargeWiseController(ControllerConfig()).evaluate(
+        SOLAR,
+        _readings(grid_power_w=-7200, ev_first_blocked=True),
+        START,
+    )
+
+    assert decision.status is ControllerStatus.WAITING
+    assert decision.reason is ChargeWiseReason.EV_FIRST_WAITING
+    assert decision.requested_current_a == 0
+    assert not decision.charger_enabled
+    assert decision.available_solar_w == 7200
 
 
 def _running(**config: int) -> ChargeWiseController:

@@ -346,6 +346,7 @@
           "battery_unavailable": "Configured battery power is unavailable or invalid",
           "ev_status_unavailable": "Configured EV connection status is unavailable",
           "ev_disconnected": "The EV is not connected",
+          "ev_first_waiting": "Waiting for the solar forecast to cover the battery's remaining need",
           "battery_confirming": "Confirming battery discharge before protection",
           "battery_protection": "Battery discharge protection is active",
           "battery_recovery": "Confirming battery recovery",

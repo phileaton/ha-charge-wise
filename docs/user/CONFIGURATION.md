@@ -69,10 +69,13 @@ restarts and shown by the diagnostic **Average house consumption** sensor. The *
 sets how quickly it adapts.
 
 **Battery target by sunset** (default 90 %) and **Forecast trust** (default 80 %) tune how cautious it is. Turn on the
-**EV-first charging** switch, which also needs **Solar charging**. While the trusted forecast, less house consumption
-until sunset, covers the battery's remaining need, the Solar budget also includes the power flowing into the battery
-(the **EV-first active** binary sensor shows this and the decision reason becomes EV first). Otherwise, or when an
-input or `sun.sun` is unavailable, Solar charging uses export only. The EV never draws from the battery itself.
+**EV-first charging** switch, which also needs **Solar charging**. Solar charging pauses while EV-first is inactive:
+when the trusted forecast, less expected house consumption until sunset, cannot cover the battery's remaining need.
+After EV-first activates, the **EV-first release margin** (default 25 %) keeps it active until the forecast surplus
+falls that far below the battery's need, preventing frequent on/off changes. While active, the Solar budget also
+includes power flowing into the battery (the **EV-first active** binary sensor shows this and the decision reason
+becomes EV first). If EV-first inputs or `sun.sun` are unavailable, Solar charging also pauses. Manual override and
+off-peak charging are unaffected. The EV never draws from the battery itself.
 
 ## Controller options
 

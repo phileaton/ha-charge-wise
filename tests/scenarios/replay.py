@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from custom_components.charge_wise.utils.charging_controller import (
     ChargeWiseController,
+    ChargeWiseReason,
     ControllerConfig,
     ControllerInput,
     ControlSettings,
@@ -168,6 +169,7 @@ def _replay_day(
                 current_target_a=current_a,
                 hardware_maximum_a=HARDWARE_MAXIMUM_A,
                 ev_first_boost_w=max(0.0, -battery_discharge) if ev_first_active else 0.0,
+                ev_first_blocked=ev_first_config is not None and not ev_first_active,
             ),
             now,
         )
@@ -187,7 +189,10 @@ def _replay_day(
             result.ev_kwh += current_a * controller_config.voltage_v * seconds / 3_600_000
             result.ev_grid_kwh += min(charger_w, max(0.0, simulated_grid)) * seconds / 3_600_000
             paused_with_budget_s = 0.0
-        elif (decision.available_solar_w or 0) >= controller_config.solar_start_w:
+        elif (
+            decision.reason is not ChargeWiseReason.EV_FIRST_WAITING
+            and (decision.available_solar_w or 0) >= controller_config.solar_start_w
+        ):
             paused_with_budget_s += seconds
             result.longest_pause_min_with_budget = max(result.longest_pause_min_with_budget, paused_with_budget_s / 60)
         else:

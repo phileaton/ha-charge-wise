@@ -31,6 +31,7 @@ class ChargeWiseReason(StrEnum):
     BATTERY_UNAVAILABLE = "battery_unavailable"
     EV_STATUS_UNAVAILABLE = "ev_status_unavailable"
     EV_DISCONNECTED = "ev_disconnected"
+    EV_FIRST_WAITING = "ev_first_waiting"
     BATTERY_CONFIRMING = "battery_confirming"
     BATTERY_PROTECTION = "battery_protection"
     BATTERY_RECOVERY = "battery_recovery"
@@ -89,6 +90,7 @@ class ControllerInput:
     current_target_a: float | None
     hardware_maximum_a: float | None
     ev_first_boost_w: float = 0.0
+    ev_first_blocked: bool = False
 
 
 @dataclass(frozen=True)
@@ -247,6 +249,18 @@ class ChargeWiseController:
         available_solar_w = max(0.0, readings.charger_power_w - readings.grid_power_w + readings.ev_first_boost_w)
         smoothed_solar_w = self._smoothed(available_solar_w, now)
         next_updates = self._update_battery_protection(readings, now)
+        if readings.ev_first_blocked:
+            return self._solar_decision(
+                ControllerStatus.WAITING,
+                ChargeWiseReason.EV_FIRST_WAITING,
+                readings,
+                0,
+                False,
+                available_solar_w,
+                next_updates,
+                now,
+            )
+
         low_solar_decision = self._evaluate_low_solar(readings, available_solar_w, now, next_updates)
         if low_solar_decision is not None:
             return low_solar_decision
@@ -318,7 +332,7 @@ class ChargeWiseController:
         if not self._battery_protection_active:
             return deadlines
 
-        if battery_discharge_w >= self.config.battery_recovery_w:
+        if battery_discharge_w > self.config.battery_recovery_w:
             self._battery_recovery_since = None
             wanted = ceil(battery_discharge_w / self.config.voltage_v)
             if wanted <= self._battery_current_reduction_a:
