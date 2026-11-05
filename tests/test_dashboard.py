@@ -5,6 +5,7 @@ from typing import Any
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.charge_wise.const import (
+    CONF_BATTERY_LEVEL_ENTITY,
     CONF_CREATE_DASHBOARD,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TODAY_ENTITY,
@@ -66,6 +67,7 @@ async def test_dashboard_is_created_with_the_entry_entities(
         config_entry,
         create=True,
         options={
+            CONF_BATTERY_LEVEL_ENTITY: "sensor.home_battery_level",
             CONF_FORECAST_REMAINING_ENTITY: "sensor.solcast_forecast_remaining",
             CONF_FORECAST_TODAY_ENTITY: "sensor.solcast_forecast_today",
             CONF_SOLAR_POWER_ENTITY: "sensor.solar_power",
@@ -81,16 +83,16 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert URL_PATH in hass.data[DATA_PANELS]
     assert view["type"] == "sections"
     assert [section["cards"][0]["heading"] for section in view["sections"]] == [
+        "Charging status",
         "Live power",
         "Controls",
-        "Battery and EV",
         "EV budget",
         "Solar and history",
     ]
-    assert view["sections"][-1]["column_span"] == 2
+    assert view["sections"][-1]["column_span"] == 3
     assert {"sensor.grid_power", "sensor.charger_power", "sensor.battery_power"} <= entities
     assert "sensor.test_charger_house_consumption" in entities
-    assert "sensor.test_charger_available_solar_budget" in entities
+    assert any("sensor.test_charger_available_solar_budget" in card.get("content", "") for card in cards)
     assert "sensor.test_charger_forecast_accuracy" in entities
     assert sum(card.get("entity") == "sensor.test_charger_forecast_accuracy" for card in cards) == 1
     accuracy_tile = next(card for card in cards if card.get("entity") == "sensor.test_charger_forecast_accuracy")
@@ -112,8 +114,8 @@ async def test_dashboard_is_created_with_the_entry_entities(
         if card.get("entity") in {"sensor.solcast_forecast_today", "sensor.solcast_forecast_remaining"}
     ]
     assert {card["name"] for card in forecast_tiles} == {
-        "Forecast energy remaining today (kWh)",
-        "Forecast energy total today (kWh)",
+        "Solar remaining today",
+        "Solar forecast today",
     }
     assert all("features" not in card for card in forecast_tiles)
     production = next(card for card in cards if card.get("entity") == "sensor.solar_energy_lifetime")
@@ -122,7 +124,12 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert production["period"] == {"calendar": {"period": "day"}}
     controls = next(card for card in cards if card["type"] == "entities")
     assert len(controls["entities"]) == 7
-    assert any(entity.startswith("switch.test_charger") for entity in controls["entities"])
+    assert any(row.get("entity", "").startswith("switch.test_charger") for row in controls["entities"])
+    conditional = [row for row in controls["entities"] if row.get("type") == "conditional"]
+    assert {row["row"]["name"] for row in conditional} == {"Manual current", "Off-peak current"}
+    assert all(row["conditions"][0]["state"] == "on" for row in conditional)
+    assert sum(card["type"] == "gauge" for card in cards) == 1
+    assert chart["grid_options"]["columns"] == "full"
 
 
 async def test_dashboard_is_not_created_unless_requested(
@@ -176,4 +183,12 @@ async def test_dashboard_templates_render_the_live_flow(
     assert any("Exporting 1.5 kW" in text and "Battery charging 0.5 kW" in text for text in rendered)
     assert any("EV charging at 2.0 kW" in text for text in rendered)
     assert not any("Solar covers" in text for text in rendered)
+    assert any("Off-peak charging is disabled" in text for text in rendered)
+    budget = next(card for card in markdown if "Solar available for EV" in card["content"])
+    hass.states.async_set("sensor.test_charger_available_solar_budget", "7950", watts)
+    assert "7.95 kW" in Template(budget["content"], hass).async_render()
+    hass.states.async_set("sensor.test_charger_available_solar_budget", "7.95", {"unit_of_measurement": "kW"})
+    assert "7.95 kW" in Template(budget["content"], hass).async_render()
+    hass.states.async_set("sensor.test_charger_available_solar_budget", "unavailable")
+    assert "Unavailable" in Template(budget["content"], hass).async_render()
     assert not any(card["type"] == "custom:apexcharts-card" for card in cards)
