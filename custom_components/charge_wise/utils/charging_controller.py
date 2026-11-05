@@ -51,6 +51,7 @@ class ControllerConfig:
     maximum_current_a: int = 32
     voltage_v: int = 240
     solar_start_w: int = 1800
+    solar_start_confirmation_s: int = 60
     low_solar_confirmation_s: int = 90
     cooldown_s: int = 180
     battery_discharge_w: int = 300
@@ -114,6 +115,7 @@ class ChargeWiseController:
         self.config = config
         self._solar_running = False
         self._low_solar_since: datetime | None = None
+        self._start_since: datetime | None = None
         self._battery_discharge_since: datetime | None = None
         self._battery_recovery_since: datetime | None = None
         self._cooldown_until: datetime | None = None
@@ -132,6 +134,7 @@ class ChargeWiseController:
         """Drop Solar timers and latches when Solar stops owning the charger."""
         self._solar_running = False
         self._low_solar_since = None
+        self._start_since = None
         self._battery_discharge_since = None
         self._battery_recovery_since = None
         self._battery_protection_active = False
@@ -278,6 +281,8 @@ class ChargeWiseController:
                 now,
             )
 
+        if readings.charger_enabled or available_solar_w < self.config.solar_start_w:
+            self._start_since = None
         if not readings.charger_enabled and available_solar_w < self.config.solar_start_w:
             return self._solar_decision(
                 ControllerStatus.WAITING,
@@ -302,6 +307,23 @@ class ChargeWiseController:
                 next_updates,
                 now,
             )
+
+        if not readings.charger_enabled:
+            if self._start_since is None:
+                self._start_since = now
+            start_deadline = self._start_since + timedelta(seconds=self.config.solar_start_confirmation_s)
+            if now < start_deadline:
+                next_updates.append(start_deadline)
+                return self._solar_decision(
+                    ControllerStatus.WAITING,
+                    ChargeWiseReason.SOLAR_WAITING,
+                    readings,
+                    0,
+                    False,
+                    available_solar_w,
+                    next_updates,
+                    now,
+                )
 
         return self._solar_charging_decision(readings, available_solar_w, smoothed_solar_w, maximum, next_updates, now)
 
@@ -563,6 +585,7 @@ class ChargeWiseController:
             self._cooldown_until = now + timedelta(seconds=self.config.cooldown_s)
         self._safety_paused = True
         self._low_solar_since = None
+        self._start_since = None
         self._battery_discharge_since = None
         self._battery_recovery_since = None
         return self._decision(

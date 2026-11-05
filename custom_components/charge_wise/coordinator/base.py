@@ -76,7 +76,14 @@ from custom_components.charge_wise.utils.forecast_accuracy import ForecastAccura
 from custom_components.charge_wise.utils.house_load import HouseLoadProfile
 from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
 from homeassistant.components.recorder.history import state_changes_during_period
-from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, STATE_OFF, STATE_ON, UnitOfEnergy
+from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    ATTR_UNIT_OF_MEASUREMENT,
+    STATE_OFF,
+    STATE_ON,
+    STATE_UNAVAILABLE,
+    UnitOfEnergy,
+)
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
@@ -654,10 +661,11 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
 
         current_entity = self.options[CONF_CURRENT_TARGET_ENTITY]
         current_state = self._number_value(current_entity)
-        if current_state is None or not isclose(
-            current_state,
-            decision.requested_current_a,
-            abs_tol=0.01,
+        current_object = self.hass.states.get(current_entity)
+        # OCPP exposes the session limit only while a transaction runs; it is applied on the update that follows the start.
+        current_unavailable = current_object is None or current_object.state == STATE_UNAVAILABLE
+        if not current_unavailable and (
+            current_state is None or not isclose(current_state, decision.requested_current_a, abs_tol=0.01)
         ):
             await self.hass.services.async_call(
                 "number",

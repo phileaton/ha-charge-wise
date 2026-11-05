@@ -63,7 +63,7 @@ def test_master_off_never_requests_charging() -> None:
 
 def test_solar_mode_starts_only_after_the_start_threshold() -> None:
     """Solar mode waits below its start threshold and floors current to available power."""
-    controller = ChargeWiseController(ControllerConfig())
+    controller = ChargeWiseController(ControllerConfig(solar_start_confirmation_s=0))
     waiting = controller.evaluate(
         SOLAR,
         _readings(grid_power_w=-1799),
@@ -79,6 +79,25 @@ def test_solar_mode_starts_only_after_the_start_threshold() -> None:
     assert not waiting.charger_enabled
     assert charging.status is ControllerStatus.CHARGING
     assert charging.requested_current_a == 7
+
+
+def test_solar_start_must_hold_before_the_charger_is_started() -> None:
+    """A brief surplus spike never starts the charger; a sustained one does."""
+    controller = ChargeWiseController(ControllerConfig(solar_start_confirmation_s=60))
+    spike = controller.evaluate(SOLAR, _readings(grid_power_w=-3000), START)
+    gone = controller.evaluate(SOLAR, _readings(grid_power_w=-100), START + timedelta(seconds=1))
+    again = controller.evaluate(SOLAR, _readings(grid_power_w=-3000), START + timedelta(seconds=2))
+    early = controller.evaluate(SOLAR, _readings(grid_power_w=-3000), START + timedelta(seconds=61))
+    held = controller.evaluate(SOLAR, _readings(grid_power_w=-3000), START + timedelta(seconds=62))
+
+    assert not spike.charger_enabled
+    assert spike.reason is ChargeWiseReason.SOLAR_WAITING
+    assert spike.next_update_at == START + timedelta(seconds=60)
+    assert not gone.charger_enabled
+    assert not again.charger_enabled
+    assert not early.charger_enabled
+    assert held.charger_enabled
+    assert held.status is ControllerStatus.CHARGING
 
 
 def test_battery_protection_is_confirmed_and_reduces_full_discharge() -> None:
@@ -324,12 +343,12 @@ def test_offpeak_outside_a_window_waits_and_schedules_the_next_boundary() -> Non
 def test_highest_request_wins_when_solar_and_offpeak_are_on() -> None:
     """Solar above the off-peak current wins; below it, off-peak wins."""
     settings = _offpeak(solar_enabled=True, offpeak_current_a=10)
-    high_solar = ChargeWiseController(ControllerConfig()).evaluate(
+    high_solar = ChargeWiseController(ControllerConfig(solar_start_confirmation_s=0)).evaluate(
         settings,
         _readings(grid_power_w=-6000),
         START,
     )
-    low_solar = ChargeWiseController(ControllerConfig()).evaluate(
+    low_solar = ChargeWiseController(ControllerConfig(solar_start_confirmation_s=0)).evaluate(
         settings,
         _readings(grid_power_w=-2000),
         START,
@@ -391,9 +410,9 @@ def test_no_source_enabled_does_not_charge() -> None:
 
 def test_ev_first_boost_adds_battery_charge_power_to_the_solar_budget() -> None:
     """With the boost the EV may use power that would otherwise charge the battery."""
-    controller = ChargeWiseController(ControllerConfig())
+    controller = ChargeWiseController(ControllerConfig(solar_start_confirmation_s=0))
     plain = controller.evaluate(SOLAR, _readings(grid_power_w=-1800), START)
-    boosted = ChargeWiseController(ControllerConfig()).evaluate(
+    boosted = ChargeWiseController(ControllerConfig(solar_start_confirmation_s=0)).evaluate(
         SOLAR,
         _readings(grid_power_w=-1800, ev_first_boost_w=2400),
         START,
@@ -422,7 +441,7 @@ def test_ev_first_forecast_gate_pauses_solar_charging() -> None:
 
 
 def _running(**config: int) -> ChargeWiseController:
-    return ChargeWiseController(ControllerConfig(smoothing_window_s=0, **config))
+    return ChargeWiseController(ControllerConfig(smoothing_window_s=0, solar_start_confirmation_s=0, **config))
 
 
 def test_settle_hold_blocks_further_changes_until_the_charger_catches_up() -> None:

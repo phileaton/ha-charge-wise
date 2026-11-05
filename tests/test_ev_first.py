@@ -116,9 +116,10 @@ async def test_ev_first_forecast_shortfall_stops_solar_charging(
     hass.services.async_register("number", "set_value", set_current)
     hass.services.async_register("switch", "turn_on", turn_on)
     hass.services.async_register("switch", "turn_off", turn_off)
-    freezer.tick(31)
-    await ev_first_entry.runtime_data.coordinator._async_evaluate()  # noqa: SLF001
-    await hass.async_block_till_done()
+    for _ in range(2):
+        freezer.tick(61)
+        await ev_first_entry.runtime_data.coordinator._async_evaluate()  # noqa: SLF001
+        await hass.async_block_till_done()
 
     charger = hass.states.get("switch.charger_enable")
     assert charger is not None
