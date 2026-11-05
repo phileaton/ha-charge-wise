@@ -94,7 +94,7 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert actual_series["entity"] == "sensor.solar_power"
     assert actual_series["transform"] == "return x * 0.001;"
     assert actual_series["extend_to"] == "now"
-    assert forecast_series["show"] == {"legend_value": False}
+    assert "show" not in forecast_series
     forecast_tiles = [
         card
         for card in cards

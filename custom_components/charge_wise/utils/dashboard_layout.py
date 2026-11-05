@@ -264,7 +264,6 @@ def _solar_forecast_graph(forecast_entity: str, solar_entity: str, solar_power_s
                 "name": "Forecast",
                 "type": "area",
                 "color": _AMBER,
-                "show": {"legend_value": False},
                 "data_generator": (
                     "return (entity.attributes.detailedForecast || [])"
                     ".map(point => [Date.parse(point.period_start), point.pv_estimate])"
