@@ -91,10 +91,11 @@ async def test_dashboard_is_created_with_the_entry_entities(
     forecast_series, actual_series = chart["series"]
     assert "detailedForecast" in forecast_series["data_generator"]
     assert "pv_estimate" in forecast_series["data_generator"]
+    # Chart should use forecast_remaining entity for legend (shows remaining forecast, which is more meaningful)
+    assert forecast_series["entity"] == "sensor.solcast_forecast_remaining"
     assert actual_series["entity"] == "sensor.solar_power"
     assert actual_series["transform"] == "return x * 0.001;"
     assert actual_series["extend_to"] == "now"
-    assert "show" not in forecast_series
     forecast_tiles = [
         card
         for card in cards

@@ -307,7 +307,10 @@ def _solar_section(
                     },
                 )
             else:
-                cards.append(_solar_forecast_graph(forecast_today, solar, solar_power_scale_to_kw))
+                # Use forecast_remaining in legend if available (shows how much forecast is left to produce),
+                # otherwise use forecast_today (total daily forecast)
+                forecast_entity_for_chart = options.get(CONF_FORECAST_REMAINING_ENTITY) or forecast_today
+                cards.append(_solar_forecast_graph(forecast_entity_for_chart, solar, solar_power_scale_to_kw))
     power = [
         entity
         for entity in (
