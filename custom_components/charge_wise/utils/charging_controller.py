@@ -120,8 +120,8 @@ class ChargeWiseController:
         self._battery_recovery_since: datetime | None = None
         self._cooldown_until: datetime | None = None
         self._battery_protection_active = False
-        self._battery_current_reduction_a = 0
-        self._battery_growth_since: datetime | None = None
+        self._battery_current_limit_a: float | None = None
+        self._battery_adjustment_since: datetime | None = None
         self._safety_paused = False
         self._solar_samples: list[tuple[datetime, float]] = []
         self._hold_until: datetime | None = None
@@ -138,8 +138,8 @@ class ChargeWiseController:
         self._battery_discharge_since = None
         self._battery_recovery_since = None
         self._battery_protection_active = False
-        self._battery_current_reduction_a = 0
-        self._battery_growth_since = None
+        self._battery_current_limit_a = None
+        self._battery_adjustment_since = None
         self._safety_paused = False
         self._cooldown_until = None
         self._solar_samples = []
@@ -264,10 +264,6 @@ class ChargeWiseController:
                 now,
             )
 
-        low_solar_decision = self._evaluate_low_solar(readings, available_solar_w, now, next_updates)
-        if low_solar_decision is not None:
-            return low_solar_decision
-
         maximum = self._effective_maximum(readings)
         if maximum < self.config.minimum_current_a:
             return self._solar_decision(
@@ -280,6 +276,24 @@ class ChargeWiseController:
                 next_updates,
                 now,
             )
+
+        if self._battery_current_limit_a is not None:
+            maximum = min(maximum, self._battery_current_limit_a)
+            if maximum < self.config.minimum_current_a:
+                return self._solar_decision(
+                    ControllerStatus.PAUSED,
+                    ChargeWiseReason.BATTERY_PROTECTION,
+                    readings,
+                    0,
+                    False,
+                    available_solar_w,
+                    next_updates,
+                    now,
+                )
+
+        low_solar_decision = self._evaluate_low_solar(readings, available_solar_w, now, next_updates)
+        if low_solar_decision is not None:
+            return low_solar_decision
 
         if readings.charger_enabled or available_solar_w < self.config.solar_start_w:
             self._start_since = None
@@ -345,7 +359,8 @@ class ChargeWiseController:
                 deadlines.append(battery_deadline)
             elif not self._battery_protection_active:
                 self._battery_protection_active = True
-                self._battery_current_reduction_a = ceil(battery_discharge_w / self.config.voltage_v)
+                self._reduce_battery_current(readings, battery_discharge_w)
+                self._battery_adjustment_since = now
                 self._cooldown_until = now + timedelta(seconds=self.config.cooldown_s)
                 deadlines.append(self._cooldown_until)
         else:
@@ -356,22 +371,18 @@ class ChargeWiseController:
 
         if battery_discharge_w > self.config.battery_recovery_w:
             self._battery_recovery_since = None
-            wanted = ceil(battery_discharge_w / self.config.voltage_v)
-            if wanted <= self._battery_current_reduction_a:
-                self._battery_current_reduction_a = wanted
-                self._battery_growth_since = None
-            else:
-                if self._battery_growth_since is None:
-                    self._battery_growth_since = now
-                growth_deadline = self._battery_growth_since + timedelta(seconds=self.config.battery_confirmation_s)
-                if now >= growth_deadline:
-                    self._battery_current_reduction_a = wanted
-                    self._battery_growth_since = None
-                else:
-                    deadlines.append(growth_deadline)
+            if self._battery_adjustment_since is None:
+                self._battery_adjustment_since = now
+            adjustment_deadline = self._battery_adjustment_since + timedelta(seconds=self.config.battery_confirmation_s)
+            if now >= adjustment_deadline and now > self._battery_adjustment_since:
+                self._reduce_battery_current(readings, battery_discharge_w)
+                self._battery_adjustment_since = now
+                adjustment_deadline = now + timedelta(seconds=self.config.battery_confirmation_s)
+            if adjustment_deadline > now:
+                deadlines.append(adjustment_deadline)
             return deadlines
 
-        self._battery_growth_since = None
+        self._battery_adjustment_since = None
 
         if self._battery_recovery_since is None:
             self._battery_recovery_since = now
@@ -380,8 +391,7 @@ class ChargeWiseController:
         )
         if now >= recovery_deadline and (self._cooldown_until is None or now >= self._cooldown_until):
             self._battery_protection_active = False
-            self._battery_current_reduction_a = 0
-            self._battery_growth_since = None
+            self._battery_current_limit_a = None
             self._battery_recovery_since = None
             self._cooldown_until = None
         else:
@@ -391,6 +401,19 @@ class ChargeWiseController:
                 if deadline is not None and deadline > now
             )
         return deadlines
+
+    def _reduce_battery_current(self, readings: ControllerInput, battery_discharge_w: float) -> None:
+        """Latch a current ceiling so later evaluations cannot subtract the same correction again."""
+        available_w = max(
+            0.0,
+            (readings.charger_power_w or 0.0) - (readings.grid_power_w or 0.0) + readings.ev_first_boost_w,
+        )
+        current_a = floor(available_w / self.config.voltage_v)
+        if readings.current_target_a is not None and readings.charger_enabled:
+            current_a = min(current_a, readings.current_target_a)
+        if self._battery_current_limit_a is not None:
+            current_a = min(current_a, self._battery_current_limit_a)
+        self._battery_current_limit_a = max(0.0, current_a - ceil(battery_discharge_w / self.config.voltage_v))
 
     def _evaluate_low_solar(
         self,
@@ -453,20 +476,6 @@ class ChargeWiseController:
             max(floor(smoothed_solar_w / self.config.voltage_v), self.config.minimum_current_a),
             maximum,
         )
-        if self._battery_protection_active:
-            target -= self._battery_current_reduction_a
-            if target < self.config.minimum_current_a:
-                return self._solar_decision(
-                    ControllerStatus.PAUSED,
-                    ChargeWiseReason.BATTERY_PROTECTION,
-                    readings,
-                    0,
-                    False,
-                    available_solar_w,
-                    next_updates,
-                    now,
-                )
-
         if (
             readings.charger_enabled
             and readings.current_target_a is not None

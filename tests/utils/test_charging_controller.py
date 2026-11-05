@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from custom_components.charge_wise.utils.charging_controller import (
     ChargeWiseController,
     ChargeWiseReason,
@@ -244,6 +246,126 @@ def test_battery_protection_recovers_when_recovery_threshold_is_zero() -> None:
     assert recovering.battery_protection_active
     assert recovered.reason is ChargeWiseReason.SOLAR_CHARGING
     assert not recovered.battery_protection_active
+
+
+@pytest.mark.parametrize("battery_discharge_w", [0, -2000])
+def test_battery_recovery_holds_current_as_charger_power_follows_the_target(battery_discharge_w: float) -> None:
+    """A corrected charger holds its current throughout recovery without repeating the cut."""
+    controller = _running(
+        battery_confirmation_s=0,
+        battery_recovery_confirmation_s=60,
+        battery_recovery_w=0,
+        cooldown_s=900,
+        settle_hold_s=0,
+    )
+    protected = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True, current_target_a=25, charger_power_w=6000, grid_power_w=0, battery_discharge_w=1440
+        ),
+        START,
+    )
+    assert protected.requested_current_a == 19
+
+    for elapsed_s in (30, 60, 120, 600, 899):
+        recovering = controller.evaluate(
+            SOLAR,
+            _readings(
+                charger_enabled=True,
+                current_target_a=19,
+                charger_power_w=4560,
+                grid_power_w=0,
+                battery_discharge_w=battery_discharge_w,
+            ),
+            START + timedelta(seconds=elapsed_s),
+        )
+        assert recovering.requested_current_a == 19
+        assert recovering.charger_enabled
+        assert recovering.reason is ChargeWiseReason.BATTERY_RECOVERY
+        assert recovering.battery_protection_active
+
+    recovered = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True,
+            current_target_a=19,
+            charger_power_w=4560,
+            grid_power_w=-1440,
+            battery_discharge_w=battery_discharge_w,
+        ),
+        START + timedelta(seconds=900),
+    )
+    assert recovered.requested_current_a == 25
+    assert not recovered.battery_protection_active
+
+
+def test_continued_battery_discharge_requires_confirmation_before_another_cut() -> None:
+    """Residual discharge can lower the ceiling again, once a fresh confirmation interval expires."""
+    controller = _running(settle_hold_s=0)
+    initial = _readings(
+        charger_enabled=True, current_target_a=25, charger_power_w=6000, grid_power_w=0, battery_discharge_w=1440
+    )
+    controller.evaluate(SOLAR, initial, START)
+    protected = controller.evaluate(SOLAR, initial, START + timedelta(seconds=90))
+    assert protected.requested_current_a == 19
+
+    residual = _readings(
+        charger_enabled=True, current_target_a=19, charger_power_w=4560, grid_power_w=0, battery_discharge_w=480
+    )
+    early = controller.evaluate(SOLAR, residual, START + timedelta(seconds=120))
+    assert early.requested_current_a == 19
+    assert early.next_update_at == START + timedelta(seconds=180)
+    confirmed = controller.evaluate(SOLAR, residual, START + timedelta(seconds=180))
+    assert confirmed.requested_current_a == 17
+
+
+def test_renewed_discharge_after_recovery_starts_a_fresh_confirmation() -> None:
+    """An interrupted recovery cannot cause an immediate second battery correction."""
+    controller = _running(settle_hold_s=0, cooldown_s=900)
+    initial = _readings(
+        charger_enabled=True, current_target_a=25, charger_power_w=6000, grid_power_w=0, battery_discharge_w=1440
+    )
+    controller.evaluate(SOLAR, initial, START)
+    controller.evaluate(SOLAR, initial, START + timedelta(seconds=90))
+    controller.evaluate(
+        SOLAR,
+        _readings(charger_enabled=True, current_target_a=19, charger_power_w=4560, grid_power_w=0),
+        START + timedelta(seconds=120),
+    )
+    residual = _readings(
+        charger_enabled=True, current_target_a=19, charger_power_w=4560, grid_power_w=0, battery_discharge_w=480
+    )
+    renewed = controller.evaluate(SOLAR, residual, START + timedelta(seconds=150))
+    assert renewed.requested_current_a == 19
+    confirming = controller.evaluate(SOLAR, residual, START + timedelta(seconds=239))
+    assert confirming.requested_current_a == 19
+    confirmed = controller.evaluate(SOLAR, residual, START + timedelta(seconds=240))
+    assert confirmed.requested_current_a == 17
+
+
+def test_battery_ceiling_cannot_be_bypassed_by_low_solar_confirmation() -> None:
+    """Battery protection stops immediately even when low-solar confirmation would hold 6 A."""
+    decision = _running(battery_confirmation_s=0).evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True, current_target_a=6, charger_power_w=1200, grid_power_w=0, battery_discharge_w=720
+        ),
+        START,
+    )
+    assert decision.reason is ChargeWiseReason.BATTERY_PROTECTION
+    assert not decision.charger_enabled
+
+
+def test_current_deadband_cannot_exceed_the_battery_ceiling() -> None:
+    """A wide current deadband must still apply the confirmed battery correction."""
+    decision = _running(battery_confirmation_s=0, current_deadband_a=10).evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True, current_target_a=12, charger_power_w=3000, grid_power_w=0, battery_discharge_w=600
+        ),
+        START,
+    )
+    assert decision.requested_current_a == 9
 
 
 def test_invalid_configured_battery_reading_pauses_solar() -> None:
