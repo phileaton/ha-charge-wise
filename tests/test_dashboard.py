@@ -8,6 +8,7 @@ from custom_components.charge_wise.const import (
     CONF_CREATE_DASHBOARD,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TODAY_ENTITY,
+    CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
 )
 from homeassistant.components.frontend import DATA_PANELS
@@ -68,6 +69,7 @@ async def test_dashboard_is_created_with_the_entry_entities(
             CONF_FORECAST_REMAINING_ENTITY: "sensor.solcast_forecast_remaining",
             CONF_FORECAST_TODAY_ENTITY: "sensor.solcast_forecast_today",
             CONF_SOLAR_POWER_ENTITY: "sensor.solar_power",
+            CONF_SOLAR_ENERGY_ENTITY: "sensor.solar_energy_lifetime",
         },
     )
 
@@ -78,10 +80,19 @@ async def test_dashboard_is_created_with_the_entry_entities(
     entities = {card["entity"] for card in cards if "entity" in card}
     assert URL_PATH in hass.data[DATA_PANELS]
     assert view["type"] == "sections"
+    assert [section["cards"][0]["heading"] for section in view["sections"]] == [
+        "Live power",
+        "Controls",
+        "Battery and EV",
+        "EV budget",
+        "Solar and history",
+    ]
+    assert view["sections"][-1]["column_span"] == 2
     assert {"sensor.grid_power", "sensor.charger_power", "sensor.battery_power"} <= entities
     assert "sensor.test_charger_house_consumption" in entities
     assert "sensor.test_charger_available_solar_budget" in entities
     assert "sensor.test_charger_forecast_accuracy" in entities
+    assert sum(card.get("entity") == "sensor.test_charger_forecast_accuracy" for card in cards) == 1
     accuracy_tile = next(card for card in cards if card.get("entity") == "sensor.test_charger_forecast_accuracy")
     assert accuracy_tile["state_content"] == ["state", "actual_vs_forecast"]
     assert any(card["type"] == "gauge" for card in cards)
@@ -105,6 +116,10 @@ async def test_dashboard_is_created_with_the_entry_entities(
         "Forecast energy total today (kWh)",
     }
     assert all("features" not in card for card in forecast_tiles)
+    production = next(card for card in cards if card.get("entity") == "sensor.solar_energy_lifetime")
+    assert production["type"] == "statistic"
+    assert production["stat_type"] == "change"
+    assert production["period"] == {"calendar": {"period": "day"}}
     controls = next(card for card in cards if card["type"] == "entities")
     assert len(controls["entities"]) == 7
     assert any(entity.startswith("switch.test_charger") for entity in controls["entities"])
@@ -160,4 +175,5 @@ async def test_dashboard_templates_render_the_live_flow(
 
     assert any("Exporting 1.5 kW" in text and "Battery charging 0.5 kW" in text for text in rendered)
     assert any("EV charging at 2.0 kW" in text for text in rendered)
+    assert not any("Solar covers" in text for text in rendered)
     assert not any(card["type"] == "custom:apexcharts-card" for card in cards)

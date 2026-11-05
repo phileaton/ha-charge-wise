@@ -86,7 +86,6 @@ def _live_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[Ca
 def _flow_summary(options: Mapping[str, Any]) -> Card:
     """Return a markdown card whose template states where the power is going right now."""
     lines: list[str] = []
-    solar = options.get(CONF_SOLAR_POWER_ENTITY)
     grid = options.get(CONF_GRID_POWER_ENTITY)
     battery = options.get(CONF_BATTERY_POWER_ENTITY)
     charger = options.get(CONF_CHARGER_POWER_ENTITY)
@@ -111,14 +110,6 @@ def _flow_summary(options: Mapping[str, Any]) -> Card:
         lines.append(f"{{% set ev = {_watts(charger)} %}}")
         lines.append(
             "{% if ev > 50 %}🚗 **EV charging at {{ (ev / 1000) | round(2) }} kW**{% else %}🚗 **EV not charging**{% endif %}",
-        )
-    if solar and charger:
-        lines.append(f"{{% set sun = {_watts(solar)} %}}")
-        lines.append(
-            "{% set share = ([sun / ev * 100, 100] | min) if ev > 50 else 0 %}"
-            "{% set filled = (share / 10) | round(0) | int %}"
-            "{% if ev > 50 %}☀️ Solar covers `{{ '█' * filled }}{{ '░' * (10 - filled) }}` "
-            "**{{ share | round(0) | int }}%** of the EV{% endif %}",
         )
     return {
         "type": "markdown",
@@ -310,26 +301,16 @@ def _solar_section(
                 )
             else:
                 cards.append(_solar_forecast_graph(forecast_today, solar, solar_power_scale_to_kw))
-                # Add forecast accuracy metric
-                cards.append(
-                    _tile(
-                        "sensor.solar_chargewise_forecast_accuracy",
-                        "Forecast accuracy (%)",
-                        "cyan",
-                        trend=False,
-                        columns=6,
-                    ),
-                )
-                # Add solar export energy (cumulative today)
                 if solar_energy := options.get(CONF_SOLAR_ENERGY_ENTITY):
                     cards.append(
-                        _tile(
-                            solar_energy,
-                            "Solar energy exported today (kWh)",
-                            "amber",
-                            trend=False,
-                            columns=6,
-                        ),
+                        {
+                            "type": "statistic",
+                            "entity": solar_energy,
+                            "name": "Solar energy produced today",
+                            "stat_type": "change",
+                            "period": {"calendar": {"period": "day"}},
+                            "grid_options": {"columns": 6},
+                        },
                     )
     power = [
         entity
@@ -384,16 +365,19 @@ def build_view(
     """
     sections = [
         _live_section(ids, options),
+        _controls_section(ids, control_keys, title),
         _battery_and_ev_section(ids, options, 1000 if budget_in_kw else 1),
         _budget_section(ids, options),
         _solar_section(ids, options, solar_power_scale_to_kw),
-        _controls_section(ids, control_keys, title),
     ]
     return {
         "type": "sections",
         "title": title,
         "path": "charge-wise",
         "icon": "mdi:ev-station",
-        "max_columns": 4,
-        "sections": [{"type": "grid", "cards": cards} for cards in sections],
+        "max_columns": 3,
+        "sections": [
+            {"type": "grid", "cards": cards, "column_span": 2 if index == len(sections) - 1 else 1}
+            for index, cards in enumerate(sections)
+        ],
     }
