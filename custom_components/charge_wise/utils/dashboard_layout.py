@@ -13,6 +13,7 @@ from custom_components.charge_wise.const import (
     CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
+    CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     CONF_SOLAR_START_W,
     CONF_VOLTAGE_V,
@@ -295,9 +296,9 @@ def _solar_section(
     """Return solar forecast tiles and the history of the power flows."""
     cards = [_heading("Solar and history", "mdi:solar-power-variant")]
     if forecast := options.get(CONF_FORECAST_REMAINING_ENTITY):
-        cards.append(_tile(forecast, "Forecast energy remaining today (kWh)", "orange", trend=False, columns=12))
+        cards.append(_tile(forecast, "Forecast energy remaining today (kWh)", "orange", trend=False, columns=6))
     if forecast_today := options.get(CONF_FORECAST_TODAY_ENTITY):
-        cards.append(_tile(forecast_today, "Forecast energy total today (kWh)", "orange", trend=False, columns=12))
+        cards.append(_tile(forecast_today, "Forecast energy total today (kWh)", "orange", trend=False, columns=6))
         if solar := options.get(CONF_SOLAR_POWER_ENTITY):
             if solar_power_scale_to_kw is None:
                 cards.append(
@@ -309,6 +310,27 @@ def _solar_section(
                 )
             else:
                 cards.append(_solar_forecast_graph(forecast_today, solar, solar_power_scale_to_kw))
+                # Add forecast accuracy metric
+                cards.append(
+                    _tile(
+                        "sensor.solar_chargewise_forecast_accuracy",
+                        "Forecast accuracy (%)",
+                        "cyan",
+                        trend=False,
+                        columns=6,
+                    ),
+                )
+                # Add solar export energy (cumulative today)
+                if solar_energy := options.get(CONF_SOLAR_ENERGY_ENTITY):
+                    cards.append(
+                        _tile(
+                            solar_energy,
+                            "Solar energy exported today (kWh)",
+                            "amber",
+                            trend=False,
+                            columns=6,
+                        ),
+                    )
     power = [
         entity
         for entity in (
