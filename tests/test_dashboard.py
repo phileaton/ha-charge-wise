@@ -86,11 +86,11 @@ async def test_dashboard_is_created_with_the_entry_entities(
         "Charging status",
         "Live power",
         "Controls",
-        "EV budget",
         "Solar and history",
     ]
     assert view["sections"][-1]["column_span"] == 3
-    assert {"sensor.grid_power", "sensor.charger_power", "sensor.battery_power"} <= entities
+    assert {"sensor.charger_power", "sensor.battery_power"} <= entities
+    assert any("sensor.grid_power" in card.get("content", "") for card in cards)
     assert "sensor.test_charger_house_consumption" in entities
     assert any("sensor.test_charger_available_solar_budget" in card.get("content", "") for card in cards)
     assert "sensor.test_charger_forecast_accuracy" in entities
@@ -114,8 +114,8 @@ async def test_dashboard_is_created_with_the_entry_entities(
         if card.get("entity") in {"sensor.solcast_forecast_today", "sensor.solcast_forecast_remaining"}
     ]
     assert {card["name"] for card in forecast_tiles} == {
-        "Solar remaining today",
-        "Solar forecast today",
+        "Remaining today",
+        "Today’s forecast",
     }
     assert all("features" not in card for card in forecast_tiles)
     production = next(card for card in cards if card.get("entity") == "sensor.solar_energy_lifetime")
@@ -128,8 +128,16 @@ async def test_dashboard_is_created_with_the_entry_entities(
     conditional = [row for row in controls["entities"] if row.get("type") == "conditional"]
     assert {row["row"]["name"] for row in conditional} == {"Manual current", "Off-peak current"}
     assert all(row["conditions"][0]["state"] == "on" for row in conditional)
-    assert sum(card["type"] == "gauge" for card in cards) == 1
-    assert chart["grid_options"]["columns"] == "full"
+    assert sum(card["type"] == "gauge" for card in cards) == 2
+    assert chart["grid_options"] == {"columns": "full", "rows": 6}
+    assert chart["section_mode"] is True
+    current = next(card for card in cards if card.get("name") == "Requested current")
+    assert current["type"] == "gauge"
+    assert current["max"] == 32
+    battery = next(card for card in cards if card.get("name") == "Home battery")
+    assert current["grid_options"] == battery["grid_options"]
+    assert any("state_translated" in card.get("content", "") for card in cards)
+    assert any(card.get("heading") == "EV budget" for card in view["sections"][2]["cards"])
 
 
 async def test_dashboard_is_not_created_unless_requested(
@@ -191,4 +199,12 @@ async def test_dashboard_templates_render_the_live_flow(
     assert "7.95 kW" in Template(budget["content"], hass).async_render()
     hass.states.async_set("sensor.test_charger_available_solar_budget", "unavailable")
     assert "Unavailable" in Template(budget["content"], hass).async_render()
+    grid = next(card for card in markdown if "**Grid**" in card["content"])
+    hass.states.async_set("sensor.grid_power", "-0.0", {"unit_of_measurement": "kW"})
+    assert "Balanced" in Template(grid["content"], hass).async_render()
+    hass.states.async_set("sensor.grid_power", "unavailable")
+    assert "Unavailable" in Template(grid["content"], hass).async_render()
+    average = next(card for card in markdown if "**House average**" in card["content"])
+    hass.states.async_set("sensor.test_charger_average_house_consumption", "2075", watts)
+    assert "2.08 kW" in Template(average["content"], hass).async_render()
     assert not any(card["type"] == "custom:apexcharts-card" for card in cards)

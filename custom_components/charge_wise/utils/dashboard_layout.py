@@ -12,6 +12,7 @@ from custom_components.charge_wise.const import (
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
+    CONF_MAXIMUM_CURRENT_A,
     CONF_OFFPEAK_WINDOWS,
     CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
@@ -55,6 +56,25 @@ def _heading(title: str, icon: str, badges: list[Card] | None = None) -> Card:
     return card
 
 
+def _power_value(entity_id: str, name: str, *, grid: bool = False) -> Card:
+    """Return a compact power reading in kW with unavailable values kept explicit."""
+    value = "{{ (power / 1000) | round(2) }} kW"
+    if grid:
+        value = (
+            "{% if power > 50 %}Importing {{ (power / 1000) | round(2) }} kW"
+            "{% elif power < -50 %}Exporting {{ (-power / 1000) | round(2) }} kW"
+            "{% else %}Balanced{% endif %}"
+        )
+    return {
+        "type": "markdown",
+        "content": f"**{name}**\n\n"
+        f"{{% if is_number(states('{entity_id}')) %}}"
+        f"{{% set power = {_watts(entity_id)} %}}"
+        f"{value}{{% else %}}Unavailable{{% endif %}}",
+        "grid_options": {"columns": 6, "rows": 2},
+    }
+
+
 def _live_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[Card]:
     """Return the section of live power tiles and the energy flow summary."""
     cards = [_heading("Live power", "mdi:flash")]
@@ -63,7 +83,7 @@ def _live_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[Ca
     if "house_load" in ids:
         cards.append(_tile(ids["house_load"], "Home", "blue"))
     if grid := options.get(CONF_GRID_POWER_ENTITY):
-        cards.append(_tile(grid, "Grid", "red"))
+        cards.append(_power_value(grid, "Grid", grid=True))
     if battery := options.get(CONF_BATTERY_POWER_ENTITY):
         cards.append(_tile(battery, "Battery", "green"))
     if charger := options.get(CONF_CHARGER_POWER_ENTITY):
@@ -120,11 +140,18 @@ def _battery_and_ev_section(
 ) -> list[Card]:
     """Return charging status, its reason and compact battery and EV readings."""
     cards = [_heading("Charging status", "mdi:ev-station")]
-    for key, name in (("controller_status", "Status"), ("decision_reason", "Why")):
-        if key in ids:
-            cards.append(_tile(ids[key], name, "purple", trend=False, columns=12))
+    if "controller_status" in ids:
+        cards.append(_tile(ids["controller_status"], "Status", "purple", trend=False))
     if "ev_first_active" in ids:
-        cards.append(_tile(ids["ev_first_active"], "EV-first active", "purple", trend=False, columns=12))
+        cards.append(_tile(ids["ev_first_active"], "EV-first active", "purple", trend=False))
+    if "decision_reason" in ids:
+        cards.append(
+            {
+                "type": "markdown",
+                "content": f"**Why**\n\n{{{{ state_translated('{ids['decision_reason']}') }}}}",
+                "grid_options": {"columns": 12},
+            }
+        )
     if level := options.get(CONF_BATTERY_LEVEL_ENTITY):
         cards.append(
             {
@@ -138,6 +165,19 @@ def _battery_and_ev_section(
                 "grid_options": {"columns": 6, "rows": 3},
             },
         )
+    if "requested_current" in ids:
+        cards.append(
+            {
+                "type": "gauge",
+                "entity": ids["requested_current"],
+                "name": "Requested current",
+                "min": 0,
+                "max": float(options.get(CONF_MAXIMUM_CURRENT_A, 32)),
+                "needle": True,
+                "segments": _gauge_segments((0, "#9e9e9e"), (6, "#8e63c7")),
+                "grid_options": {"columns": 6, "rows": 3},
+            }
+        )
     if "available_solar_budget" in ids:
         entity = ids["available_solar_budget"]
         default_unit = "kW" if budget_in_kw else "W"
@@ -150,13 +190,13 @@ def _battery_and_ev_section(
                 "type": "markdown",
                 "content": f"**Solar available for EV**\n\n"
                 f"{{% if is_number(states('{entity}')) %}}"
-                f"## {{{{ ({watts} / 1000) | round(2) }}}} kW\n"
+                f"{{{{ ({watts} / 1000) | round(2) }}}} kW\n"
                 "{% else %}Unavailable{% endif %}",
-                "grid_options": {"columns": 6},
+                "grid_options": {"columns": 6, "rows": 2},
             }
         )
-    if "requested_current" in ids:
-        cards.append(_tile(ids["requested_current"], "Requested current", "purple", trend=False))
+    if charger := options.get(CONF_CHARGER_POWER_ENTITY):
+        cards.append(_power_value(charger, "Actual charger power"))
     return cards
 
 
@@ -164,7 +204,6 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
     """Return how the EV budget is calculated: house use, battery need and forecast surplus."""
     cards = [_heading("EV budget", "mdi:calculator-variant")]
     tiles = (
-        ("house_load", "House now", "blue"),
         ("average_house_load", "House average", "blue"),
         ("battery_need", "Battery still needs", "green"),
         ("forecast_surplus", "Forecast surplus", "yellow"),
@@ -179,6 +218,8 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
                 trend=key in {"house_load", "forecast_surplus"},
                 columns=12 if key == "forecast_accuracy" else 6,
             )
+            if key == "average_house_load":
+                card = _power_value(ids[key], name)
             if key == "forecast_accuracy":
                 card["state_content"] = ["state", "actual_vs_forecast"]
             cards.append(card)
@@ -200,9 +241,7 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
             )
         if enabled:
             content += "{% endif %}"
-        cards.append(
-            {"type": "markdown", "title": "Next off-peak window", "content": content, "grid_options": {"columns": 12}}
-        )
+        cards.append({"type": "markdown", "content": "**Off-peak** · " + content, "grid_options": {"columns": 12}})
     return cards
 
 
@@ -216,14 +255,12 @@ def _budget_summary(ids: Mapping[str, str]) -> Card:
         "{% if need is none or spare is none %}🌙 **Forecast balance unavailable** (the sun is down or an input is missing)"
         "{% else %}"
         "{% set covered = [spare / need * 100, 100] | min if need > 0 else 100 %}"
-        "{% set filled = (covered / 10) | round(0) | int %}"
-        "`{{ '█' * filled }}{{ '░' * (10 - filled) }}` "
-        "**{{ [covered, 0] | max | round(0) | int }}%** of the battery's need is covered by the forecast\n\n"
+        "**Forecast balance: {{ [covered, 0] | max | round(0) | int }}% covered**\n\n"
         "{% if spare >= need %}✅ The forecast covers the battery, so the EV may share its charging power"
         "{% else %}⏳ The battery comes first until the forecast catches up{% endif %}"
         "{% endif %}"
     )
-    return {"type": "markdown", "title": "Forecast balance", "content": content, "grid_options": {"columns": 12}}
+    return {"type": "markdown", "content": content, "grid_options": {"columns": 12}}
 
 
 def _solar_forecast_graph(forecast_entity: str, solar_entity: str, solar_power_scale_to_kw: float) -> Card:
@@ -232,6 +269,7 @@ def _solar_forecast_graph(forecast_entity: str, solar_entity: str, solar_power_s
         "type": "custom:apexcharts-card",
         "header": {"show": True, "title": "Solar power: forecast vs actual (kW)"},
         "graph_span": "24h",
+        "section_mode": True,
         "span": {"start": "day"},
         "now": {"show": True, "label": "Now"},
         "series": [
@@ -259,7 +297,7 @@ def _solar_forecast_graph(forecast_entity: str, solar_entity: str, solar_power_s
                 "group_by": {"duration": "30min", "func": "avg"},
             },
         ],
-        "grid_options": {"columns": "full"},
+        "grid_options": {"columns": "full", "rows": 6},
     }
 
 
@@ -271,9 +309,9 @@ def _solar_section(
     """Return solar forecast tiles and the history of the power flows."""
     cards = [_heading("Solar and history", "mdi:solar-power-variant")]
     if forecast := options.get(CONF_FORECAST_REMAINING_ENTITY):
-        cards.append(_tile(forecast, "Solar remaining today", "orange", trend=False, columns=6))
+        cards.append(_tile(forecast, "Remaining today", "orange", trend=False, columns=6))
     if forecast_today := options.get(CONF_FORECAST_TODAY_ENTITY):
-        cards.append(_tile(forecast_today, "Solar forecast today", "orange", trend=False, columns=6))
+        cards.append(_tile(forecast_today, "Today’s forecast", "orange", trend=False, columns=6))
         if solar := options.get(CONF_SOLAR_POWER_ENTITY):
             if solar_power_scale_to_kw is None:
                 cards.append(
@@ -284,18 +322,18 @@ def _solar_section(
                     },
                 )
             else:
-                cards.append(_solar_forecast_graph(forecast_today, solar, solar_power_scale_to_kw))
                 if solar_energy := options.get(CONF_SOLAR_ENERGY_ENTITY):
                     cards.append(
                         {
                             "type": "statistic",
                             "entity": solar_energy,
-                            "name": "Solar energy produced today",
+                            "name": "Produced today",
                             "stat_type": "change",
                             "period": {"calendar": {"period": "day"}},
                             "grid_options": {"columns": 6},
                         },
                     )
+                cards.append(_solar_forecast_graph(forecast_today, solar, solar_power_scale_to_kw))
     power = [
         entity
         for entity in (
@@ -362,8 +400,7 @@ def build_view(
     sections = [
         _battery_and_ev_section(ids, options, budget_in_kw),
         _live_section(ids, options),
-        _controls_section(ids, control_keys),
-        _budget_section(ids, options),
+        _controls_section(ids, control_keys) + _budget_section(ids, options),
         _solar_section(ids, options, solar_power_scale_to_kw),
     ]
     return {
