@@ -89,12 +89,12 @@ async def test_ev_first_adds_battery_charge_power_to_the_solar_budget(
     assert float(hass.states.get(budget).state) == 0
 
 
-async def test_ev_first_forecast_shortfall_stops_solar_charging(
+async def test_ev_first_forecast_shortfall_preserves_genuine_export_charging(
     hass: HomeAssistant,
     ev_first_entry: MockConfigEntry,
     freezer: FrozenDateTimeFactory,
 ) -> None:
-    """Solar-mode charging pauses when the forecast cannot cover the battery need."""
+    """A forecast shortfall withdraws sharing but permits charging from genuine grid export."""
     watts = {"unit_of_measurement": "W"}
     hass.states.async_set("sensor.grid_power", "-7200", watts)
     await hass.async_block_till_done()
@@ -131,7 +131,7 @@ async def test_ev_first_forecast_shortfall_stops_solar_charging(
     active = hass.states.get(_entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active"))
     charger = hass.states.get("switch.charger_enable")
     assert active is not None
-    assert active.state == "on"
+    assert active.state == "off"
     assert charger is not None
     assert charger.state == "on"
 
@@ -141,9 +141,9 @@ async def test_ev_first_forecast_shortfall_stops_solar_charging(
     reason = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "decision_reason"))
     charger = hass.states.get("switch.charger_enable")
     assert reason is not None
-    assert reason.state == "ev_first_waiting"
+    assert reason.state == "solar_charging"
     assert charger is not None
-    assert charger.state == "off"
+    assert charger.state == "on"
 
 
 async def test_ev_first_switch_is_refused_without_forecast_inputs(
@@ -278,3 +278,62 @@ async def test_energy_counter_drives_the_forecast_accuracy(hass: HomeAssistant, 
     await hass.async_block_till_done()
 
     assert float(hass.states.get(accuracy_id).state) == pytest.approx(75)
+
+
+async def test_forecast_cutoff_reaches_the_charger_stop_command(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A poor forecast sends a stop command without waiting for low-solar confirmation."""
+    freezer.move_to("2026-11-05T12:00:00+00:00")
+    commands: list[ServiceCall] = []
+
+    async def record(call: ServiceCall) -> None:
+        commands.append(call)
+
+    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_enabled")
+    hass.services.async_register("number", "set_value", record)
+    hass.services.async_register("switch", "turn_on", record)
+    hass.services.async_register("switch", "turn_off", record)
+    commands.clear()
+    _set_sun(hass, 4.5)
+    watts = {"unit_of_measurement": "W"}
+    hass.states.async_set("sensor.solar_production", "4800", watts)
+    hass.states.async_set("sensor.charger_power", "4800", watts)
+    hass.states.async_set("sensor.grid_power", "0", watts)
+    hass.states.async_set("sensor.battery_power", "0", watts)
+    hass.states.async_set("number.current_limit", "20", {"unit_of_measurement": "A"})
+    hass.states.async_set("switch.charger_enable", "on")
+    await hass.async_block_till_done()
+    active = hass.states.get(_entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active"))
+    assert active is not None and active.state == "on"
+    commands.clear()
+    hass.states.async_set("sensor.forecast_remaining", "1", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+    target = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "requested_current"))
+    budget = hass.states.get(_entity_id(hass, ev_first_entry, "sensor", "available_solar_budget"))
+    assert target is not None
+    assert float(target.state) == 0
+    assert budget is not None
+    assert float(budget.state) == pytest.approx(4.8)
+    assert any(call.service == "turn_off" for call in commands)
+
+
+async def test_full_battery_releases_forecast_restriction(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+) -> None:
+    """Battery level changes release and restore priority through the live state listener."""
+    hass.states.async_set("sensor.forecast_remaining", "0", {"unit_of_measurement": "kWh"})
+    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_enabled")
+    active = _entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active")
+    assert hass.states.get(active).state == "off"
+
+    hass.states.async_set("sensor.battery_level", "100", {"unit_of_measurement": "%"})
+    await hass.async_block_till_done()
+    assert hass.states.get(active).state == "on"
+
+    hass.states.async_set("sensor.battery_level", "99", {"unit_of_measurement": "%"})
+    await hass.async_block_till_done()
+    assert hass.states.get(active).state == "off"

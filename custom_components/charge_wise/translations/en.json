@@ -21,7 +21,7 @@
           "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
           "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
           "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
-          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
+          "ev_connected_entity": "Optional binary sensor or charger status sensor. For binary sensors: on = connected, off = disconnected. For OCPP status sensor (sensor.charger_status_connector): Available = disconnected, any other state = connected. When configured, charging is held unless it reports the EV connected.",
           "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
           "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
           "voltage_v": "Single-phase voltage used to convert available power to current."
@@ -80,7 +80,7 @@
           "battery_level_entity": "Battery level",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
-          "ev_first_release_margin_percent": "EV-first release margin (%)",
+          "ev_first_release_margin_percent": "EV-first restart surplus margin (%)",
           "house_load_window_days": "House consumption learning window (days)",
           "solar_power_entity": "Solar production power",
           "solar_energy_entity": "Solar production energy total",
@@ -93,7 +93,7 @@
           "solar_energy_entity": "Optional cumulative solar energy sensor (Wh, kWh or MWh), such as the one used by the Energy dashboard. When set, the forecast accuracy compares the whole day's production with the forecast instead of integrating the power sensor.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "ev_first_release_margin_percent": "Once EV-first is active, it stays active until the forecast surplus falls this far below the battery's need. Prevents flapping near the threshold. 0 disables the margin.",
+          "ev_first_release_margin_percent": "Extra forecast surplus above the battery's need required to start EV-first sharing. Sharing ends at or below full battery coverage; battery-first charging may still use grid-export surplus. 0 removes the extra sharing buffer.",
           "house_load_window_days": "How many days of history the learned consumption averages follow. Shorter adapts faster.",
           "solar_power_entity": "Optional sensor (mW, W or kW) with the current solar production. Charge Wise subtracts export and battery charging and adds the grid and battery power it already reads to work out house consumption, then learns the average per hour of day.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
@@ -170,7 +170,7 @@
           "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
           "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
           "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
-          "ev_connected_entity": "Optional binary sensor. When selected, charging is held unless it reports the EV connected.",
+          "ev_connected_entity": "Optional binary sensor or charger status sensor. For binary sensors: on = connected, off = disconnected. For OCPP status sensor (sensor.charger_status_connector): Available = disconnected, any other state = connected. When configured, charging is held unless it reports the EV connected.",
           "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
           "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
           "voltage_v": "Single-phase voltage used to convert available power to current."
@@ -229,7 +229,7 @@
           "battery_level_entity": "Battery level",
           "battery_capacity_kwh": "Battery capacity (kWh)",
           "battery_target_percent": "Battery target by sunset (%)",
-          "ev_first_release_margin_percent": "EV-first release margin (%)",
+          "ev_first_release_margin_percent": "EV-first restart surplus margin (%)",
           "house_load_window_days": "House consumption learning window (days)",
           "solar_power_entity": "Solar production power",
           "solar_energy_entity": "Solar production energy total",
@@ -242,7 +242,7 @@
           "solar_energy_entity": "Optional cumulative solar energy sensor (Wh, kWh or MWh), such as the one used by the Energy dashboard. When set, the forecast accuracy compares the whole day's production with the forecast instead of integrating the power sensor.",
           "battery_capacity_kwh": "Usable home battery capacity. EV-first charging needs this together with the three sensors above.",
           "battery_target_percent": "The battery level the forecast must still be able to reach by sunset.",
-          "ev_first_release_margin_percent": "Once EV-first is active, it stays active until the forecast surplus falls this far below the battery's need. Prevents flapping near the threshold. 0 disables the margin.",
+          "ev_first_release_margin_percent": "Extra forecast surplus above the battery's need required to start EV-first sharing. Sharing ends at or below full battery coverage; battery-first charging may still use grid-export surplus. 0 removes the extra sharing buffer.",
           "house_load_window_days": "How many days of history the learned consumption averages follow. Shorter adapts faster.",
           "solar_power_entity": "Optional sensor (mW, W or kW) with the current solar production. Charge Wise subtracts export and battery charging and adds the grid and battery power it already reads to work out house consumption, then learns the average per hour of day.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."

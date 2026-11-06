@@ -63,6 +63,9 @@ _SENSOR_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain=
 _SWITCH_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="switch"))
 _NUMBER_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="number"))
 _BINARY_SENSOR_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="binary_sensor"))
+_EV_CONNECTED_SELECTOR = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"], multiple=False)
+)
 
 type Schema = dict[probatio.Marker, selector.Selector]
 
@@ -75,7 +78,7 @@ def charger_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
         probatio.Required(CONF_CHARGER_SWITCH_ENTITY): _SWITCH_SELECTOR,
         probatio.Required(CONF_CURRENT_TARGET_ENTITY): _NUMBER_SELECTOR,
         probatio.Optional(CONF_HARDWARE_MAXIMUM_ENTITY): _NUMBER_SELECTOR,
-        probatio.Optional(CONF_EV_CONNECTED_ENTITY): _BINARY_SENSOR_SELECTOR,
+        probatio.Optional(CONF_EV_CONNECTED_ENTITY): _EV_CONNECTED_SELECTOR,
     }
     _add_number_field(schema, defaults, CONF_MINIMUM_CURRENT_A, DEFAULT_MINIMUM_CURRENT_A, 1, 32, 1, "A")
     _add_number_field(schema, defaults, CONF_MAXIMUM_CURRENT_A, None, 1, 80, 1, "A")

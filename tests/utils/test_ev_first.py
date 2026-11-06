@@ -44,8 +44,8 @@ def test_battery_above_target_needs_nothing() -> None:
     assert result.active
 
 
-def test_active_state_holds_within_the_release_margin() -> None:
-    """A surplus 10.6 kWh against a 10.8 kWh need stays active once active, but does not start."""
+def test_active_state_stops_as_soon_as_battery_coverage_is_short() -> None:
+    """A short forecast stops sharing even if it was already active."""
     inputs = _inputs(forecast_remaining_kwh=17)
 
     started = evaluate_ev_first(CONFIG, inputs)
@@ -54,7 +54,7 @@ def test_active_state_holds_within_the_release_margin() -> None:
     assert started is not None
     assert held is not None
     assert not started.active
-    assert held.active
+    assert not held.active
 
 
 def test_active_state_releases_below_the_margin() -> None:
@@ -80,3 +80,52 @@ def test_missing_input_or_set_sun_returns_none() -> None:
     for field in ("forecast_remaining_kwh", "battery_level_percent", "house_use_kwh", "hours_until_sunset"):
         assert evaluate_ev_first(CONFIG, _inputs(**{field: None})) is None
     assert evaluate_ev_first(CONFIG, _inputs(hours_until_sunset=0)) is None
+
+
+def test_battery_reserve_uses_remaining_need_and_daylight() -> None:
+    """The battery reserve is the average power required to reach its target by sunset."""
+    result = evaluate_ev_first(CONFIG, _inputs(hours_until_sunset=3, forecast_remaining_kwh=5))
+    assert result is not None
+    assert not result.active
+    assert result.battery_reserve_w == 3600
+
+
+def test_exact_battery_coverage_stops_sharing() -> None:
+    """Equality is a stop, even for an active session with a configured margin."""
+    result = evaluate_ev_first(
+        CONFIG, _inputs(forecast_remaining_kwh=10.8, forecast_accuracy=1, house_use_kwh=0), was_active=True
+    )
+    assert result is not None
+    assert result.forecast_surplus_kwh == result.battery_need_kwh
+    assert not result.active
+
+
+def test_restart_margin_is_above_the_battery_need() -> None:
+    """Surplus inside the restart buffer holds an active session but cannot begin a new one."""
+    inputs = _inputs(forecast_remaining_kwh=12, forecast_accuracy=1, house_use_kwh=0)
+    running = evaluate_ev_first(CONFIG, inputs, was_active=True)
+    restarting = evaluate_ev_first(CONFIG, inputs)
+    assert running is not None and running.active
+    assert restarting is not None and not restarting.active
+
+
+def test_full_battery_releases_forecast_priority() -> None:
+    """A full battery permits solar charging even with zero or negative forecast surplus."""
+    for forecast in (0, 3):
+        for was_active in (False, True):
+            result = evaluate_ev_first(
+                CONFIG,
+                _inputs(battery_level_percent=100, forecast_remaining_kwh=forecast, forecast_accuracy=1),
+                was_active=was_active,
+            )
+            assert result is not None
+            assert result.active
+            assert result.battery_need_kwh == 0
+            assert result.battery_reserve_w == 0
+
+
+def test_battery_below_full_retains_forecast_priority() -> None:
+    """Dropping below full restores battery priority when the forecast is short."""
+    result = evaluate_ev_first(CONFIG, _inputs(battery_level_percent=99, forecast_remaining_kwh=0))
+    assert result is not None
+    assert not result.active

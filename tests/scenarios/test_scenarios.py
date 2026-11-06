@@ -48,9 +48,9 @@ def test_energy_to_ev_never_exceeds_solar(results: list[DayResult]) -> None:
         assert item.ev_kwh <= item.solar_kwh, item.date
 
 
-def test_longer_margin_keeps_ev_first_active_at_least_as_long() -> None:
-    """A larger release margin can only hold EV-first for longer on the same days."""
+def test_longer_restart_margin_does_not_increase_sharing_time() -> None:
+    """A larger restart surplus buffer does not increase sharing on the recorded days."""
     tight = replay(DAYS, ev_first_config=with_margin(INSTALL_EV_FIRST, 5))
     loose = replay(DAYS, ev_first_config=with_margin(INSTALL_EV_FIRST, 40))
     for narrow, wide in zip(tight, loose, strict=True):
-        assert wide.ev_first_minutes >= narrow.ev_first_minutes, narrow.date
+        assert wide.ev_first_minutes <= narrow.ev_first_minutes, narrow.date

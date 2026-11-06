@@ -32,6 +32,7 @@ def _readings(
     hardware_maximum_a: float | None = 32,
     ev_first_boost_w: float = 0.0,
     ev_first_blocked: bool = False,
+    battery_reserve_w: float | None = None,
 ) -> ControllerInput:
     """Build a normal controller input with selected safety sensors."""
     return ControllerInput(
@@ -46,6 +47,7 @@ def _readings(
         hardware_maximum_a=hardware_maximum_a,
         ev_first_boost_w=ev_first_boost_w,
         ev_first_blocked=ev_first_blocked,
+        battery_reserve_w=battery_reserve_w,
     )
 
 
@@ -628,3 +630,141 @@ def test_smoothing_ignores_a_brief_spike_in_house_load() -> None:
         START + timedelta(seconds=200),
     )
     assert sustained.requested_current_a == 7
+
+
+def test_forecast_stop_bypasses_low_solar_hold_and_starts_restart_cooldown() -> None:
+    """Losing forecast permission stops immediately, then delays a recovered forecast's restart."""
+    controller = _running(settle_hold_s=300, low_solar_confirmation_s=600, cooldown_s=900)
+    stopped = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True,
+            current_target_a=6,
+            charger_power_w=1440,
+            grid_power_w=0,
+            ev_first_blocked=True,
+            battery_reserve_w=1000,
+        ),
+        START,
+    )
+    assert not stopped.charger_enabled
+    assert stopped.requested_current_a == 0
+    assert stopped.reason is ChargeWiseReason.EV_FIRST_WAITING
+    recovered = controller.evaluate(SOLAR, _readings(grid_power_w=-7200), START + timedelta(seconds=1))
+    assert not recovered.charger_enabled
+    assert recovered.reason is ChargeWiseReason.COOLDOWN
+    assert recovered.next_update_at == START + timedelta(seconds=900)
+
+
+def test_battery_first_starts_only_from_actual_export_and_keeps_the_established_session() -> None:
+    """Weak forecasts permit export-only charging without cycling when the EV consumes that export."""
+    controller = _running(settle_hold_s=0)
+    start = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=False,
+            charger_power_w=0,
+            grid_power_w=-4800,
+            battery_discharge_w=-2000,
+            ev_first_blocked=True,
+            battery_reserve_w=6000,
+        ),
+        START,
+    )
+    assert start.charger_enabled
+    assert start.requested_current_a == 20
+    for elapsed in (10, 30, 60):
+        running = controller.evaluate(
+            SOLAR,
+            _readings(
+                charger_enabled=True,
+                current_target_a=20,
+                charger_power_w=4800,
+                grid_power_w=0,
+                battery_discharge_w=-2000,
+                ev_first_blocked=True,
+                battery_reserve_w=6000,
+            ),
+            START + timedelta(seconds=elapsed),
+        )
+        assert running.charger_enabled
+        assert running.requested_current_a == 20
+
+
+def test_battery_first_does_not_count_stale_ev_draw_or_battery_charge_as_export() -> None:
+    """An off charger must see actual export; neither stale EV power nor battery charging can start it."""
+    decision = _running(settle_hold_s=0).evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=False,
+            charger_power_w=4800,
+            grid_power_w=0,
+            battery_discharge_w=-4800,
+            ev_first_boost_w=4800,
+            ev_first_blocked=True,
+            battery_reserve_w=1000,
+        ),
+        START,
+    )
+    assert not decision.charger_enabled
+    assert decision.available_solar_w == 0
+
+
+def test_losing_sharing_releases_existing_ev_allocation_before_export_only_restart() -> None:
+    """A zero-export session cannot keep its earlier battery-sharing allocation."""
+    controller = _running(settle_hold_s=0, cooldown_s=90)
+    stopped = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True,
+            current_target_a=20,
+            charger_power_w=4800,
+            grid_power_w=0,
+            battery_discharge_w=-2000,
+            ev_first_blocked=True,
+            battery_reserve_w=1000,
+        ),
+        START,
+    )
+    assert not stopped.charger_enabled
+    assert stopped.requested_current_a == 0
+    early = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=False, charger_power_w=0, grid_power_w=-2400, ev_first_blocked=True, battery_reserve_w=1000
+        ),
+        START + timedelta(seconds=10),
+    )
+    assert not early.charger_enabled
+    assert early.reason is ChargeWiseReason.COOLDOWN
+    restarted = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=False, charger_power_w=0, grid_power_w=-2400, ev_first_blocked=True, battery_reserve_w=1000
+        ),
+        START + timedelta(seconds=90),
+    )
+    assert restarted.charger_enabled
+    assert restarted.requested_current_a == 10
+
+
+def test_battery_first_cannot_reuse_an_old_smoothed_battery_boost() -> None:
+    """Withdrawing sharing also withdraws a boost retained in the smoothing history."""
+    controller = ChargeWiseController(ControllerConfig(settle_hold_s=0, solar_start_confirmation_s=0))
+    controller.evaluate(SOLAR, _readings(grid_power_w=-2400, ev_first_boost_w=4800), START)
+    decision = controller.evaluate(
+        SOLAR,
+        _readings(
+            charger_enabled=True,
+            current_target_a=10,
+            charger_power_w=2400,
+            grid_power_w=-2400,
+            battery_discharge_w=-4800,
+            ev_first_blocked=True,
+            battery_reserve_w=1000,
+        ),
+        START + timedelta(seconds=10),
+    )
+    assert decision.charger_enabled
+    assert decision.requested_current_a == 20
+    assert decision.available_solar_w == 4800

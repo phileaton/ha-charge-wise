@@ -92,6 +92,7 @@ class ControllerInput:
     hardware_maximum_a: float | None
     ev_first_boost_w: float = 0.0
     ev_first_blocked: bool = False
+    battery_reserve_w: float | None = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +108,19 @@ class ControllerDecision:
     next_update_at: datetime | None = None
 
 
+def solar_budget_w(readings: ControllerInput) -> float | None:
+    """Return the EV budget after preserving the battery's charging allocation."""
+    if readings.charger_power_w is None or readings.grid_power_w is None:
+        return None
+    budget = readings.charger_power_w - readings.grid_power_w + readings.ev_first_boost_w
+    if readings.ev_first_blocked and readings.battery_reserve_w is not None:
+        if readings.battery_discharge_w is None:
+            return None
+        charger = readings.charger_power_w if readings.charger_enabled else 0.0
+        budget = charger - readings.grid_power_w - max(0.0, readings.battery_discharge_w)
+    return max(0.0, budget)
+
+
 class ChargeWiseController:
     """Calculate safe charger commands from a snapshot of Home Assistant state."""
 
@@ -114,6 +128,7 @@ class ChargeWiseController:
         """Initialize controller timers and latches."""
         self.config = config
         self._solar_running = False
+        self._battery_first_ready = False
         self._low_solar_since: datetime | None = None
         self._start_since: datetime | None = None
         self._battery_discharge_since: datetime | None = None
@@ -133,6 +148,7 @@ class ChargeWiseController:
     def _reset_solar(self) -> None:
         """Drop Solar timers and latches when Solar stops owning the charger."""
         self._solar_running = False
+        self._battery_first_ready = False
         self._low_solar_since = None
         self._start_since = None
         self._battery_discharge_since = None
@@ -249,10 +265,25 @@ class ChargeWiseController:
         if readings.battery_configured and readings.battery_discharge_w is None:
             return self._pause(ChargeWiseReason.BATTERY_UNAVAILABLE, readings, now)
 
-        available_solar_w = max(0.0, readings.charger_power_w - readings.grid_power_w + readings.ev_first_boost_w)
+        available_solar_w = solar_budget_w(readings)
+        if available_solar_w is None:
+            return self._pause(ChargeWiseReason.BATTERY_UNAVAILABLE, readings, now)
         smoothed_solar_w = self._smoothed(available_solar_w, now)
         next_updates = self._update_battery_protection(readings, now)
-        if readings.ev_first_blocked:
+        if not readings.ev_first_blocked:
+            self._battery_first_ready = False
+        elif readings.battery_reserve_w is not None:
+            if not readings.charger_enabled or (
+                readings.grid_power_w <= -self.config.solar_start_w
+                and (readings.battery_discharge_w or 0.0) <= self.config.battery_recovery_w
+            ):
+                self._battery_first_ready = True
+
+        if readings.ev_first_blocked and (readings.battery_reserve_w is None or not self._battery_first_ready):
+            if readings.charger_enabled:
+                self._cooldown_until = now + timedelta(seconds=self.config.cooldown_s)
+            self._start_since = None
+            self._low_solar_since = None
             return self._solar_decision(
                 ControllerStatus.WAITING,
                 ChargeWiseReason.EV_FIRST_WAITING,
@@ -290,6 +321,9 @@ class ChargeWiseController:
                     next_updates,
                     now,
                 )
+
+        if readings.ev_first_blocked:
+            maximum = min(maximum, max(self.config.minimum_current_a, floor(available_solar_w / self.config.voltage_v)))
 
         low_solar_decision = self._evaluate_low_solar(readings, available_solar_w, now, next_updates)
         if low_solar_decision is not None:
@@ -472,8 +506,9 @@ class ChargeWiseController:
         now: datetime,
     ) -> ControllerDecision:
         """Build a bounded solar target, applying the deadband and the settle hold."""
+        power_w = available_solar_w if readings.ev_first_blocked else smoothed_solar_w
         target = min(
-            max(floor(smoothed_solar_w / self.config.voltage_v), self.config.minimum_current_a),
+            max(floor(power_w / self.config.voltage_v), self.config.minimum_current_a),
             maximum,
         )
         if (

@@ -89,8 +89,10 @@ async def test_dashboard_is_created_with_the_entry_entities(
         "Solar and history",
     ]
     assert view["sections"][-1]["column_span"] == 3
-    assert {"sensor.charger_power", "sensor.battery_power"} <= entities
-    assert any("sensor.grid_power" in card.get("content", "") for card in cards)
+    assert {"sensor.grid_power", "sensor.charger_power", "sensor.battery_power"} <= entities
+    grid_tile = next(card for card in cards if card.get("name") == "Grid")
+    assert grid_tile["type"] == "tile"
+    assert grid_tile["features"] == [{"type": "trend-graph", "hours_to_show": 6}]
     assert "sensor.test_charger_house_consumption" in entities
     assert any("sensor.test_charger_available_solar_budget" in card.get("content", "") for card in cards)
     assert "sensor.test_charger_forecast_accuracy" in entities
@@ -199,12 +201,31 @@ async def test_dashboard_templates_render_the_live_flow(
     assert "7.95 kW" in Template(budget["content"], hass).async_render()
     hass.states.async_set("sensor.test_charger_available_solar_budget", "unavailable")
     assert "Unavailable" in Template(budget["content"], hass).async_render()
-    grid = next(card for card in markdown if "**Grid**" in card["content"])
+    grid = next(card for card in markdown if card.get("title") == "Right now")
     hass.states.async_set("sensor.grid_power", "-0.0", {"unit_of_measurement": "kW"})
-    assert "Balanced" in Template(grid["content"], hass).async_render()
-    hass.states.async_set("sensor.grid_power", "unavailable")
-    assert "Unavailable" in Template(grid["content"], hass).async_render()
+    assert "Grid is balanced" in Template(grid["content"], hass).async_render()
     average = next(card for card in markdown if "**House average**" in card["content"])
     hass.states.async_set("sensor.test_charger_average_house_consumption", "2075", watts)
     assert "2.08 kW" in Template(average["content"], hass).async_render()
     assert not any(card["type"] == "custom:apexcharts-card" for card in cards)
+
+
+async def test_forecast_message_follows_sharing_permission(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
+    """The forecast message reports actual permission and the restart surplus threshold."""
+    await _setup(hass, config_entry, create=True)
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    cards = [card for section in config["views"][0]["sections"] for card in section["cards"]]
+    balance = next(card for card in cards if "Forecast balance:" in card.get("content", ""))
+    hass.states.async_set("sensor.test_charger_battery_energy_needed", "15")
+    hass.states.async_set("sensor.test_charger_forecast_surplus_after_house_use", "20")
+    hass.states.async_set("switch.test_charger_ev_first_charging", "on")
+    hass.states.async_set("binary_sensor.test_charger_ev_first_active", "on")
+    rendered = Template(balance["content"], hass).async_render()
+    assert "sharing is active" in rendered
+    assert "Battery-first:" not in rendered
+    hass.states.async_set("binary_sensor.test_charger_ev_first_active", "off")
+    rendered = Template(balance["content"], hass).async_render()
+    assert "Battery-first mode is active" in rendered
+    assert "grid-export surplus" in rendered
+    assert "18.75 kWh" in rendered
+    assert "25% restart margin" in rendered

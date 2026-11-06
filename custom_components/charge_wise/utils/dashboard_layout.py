@@ -9,6 +9,7 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_LEVEL_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
     CONF_CHARGER_POWER_ENTITY,
+    CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
@@ -17,6 +18,7 @@ from custom_components.charge_wise.const import (
     CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     DEFAULT_BATTERY_DISCHARGE_SIGN,
+    DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
 )
 
 type Card = dict[str, Any]
@@ -83,7 +85,7 @@ def _live_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[Ca
     if "house_load" in ids:
         cards.append(_tile(ids["house_load"], "Home", "blue"))
     if grid := options.get(CONF_GRID_POWER_ENTITY):
-        cards.append(_power_value(grid, "Grid", grid=True))
+        cards.append(_tile(grid, "Grid", "red"))
     if battery := options.get(CONF_BATTERY_POWER_ENTITY):
         cards.append(_tile(battery, "Battery", "green"))
     if charger := options.get(CONF_CHARGER_POWER_ENTITY):
@@ -224,7 +226,7 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
                 card["state_content"] = ["state", "actual_vs_forecast"]
             cards.append(card)
     if "battery_need" in ids and "forecast_surplus" in ids:
-        cards.append(_budget_summary(ids))
+        cards.append(_budget_summary(ids, options))
     if "next_offpeak_window" in ids:
         window = ids["next_offpeak_window"]
         enabled = ids.get("offpeak_enabled")
@@ -245,10 +247,13 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
     return cards
 
 
-def _budget_summary(ids: Mapping[str, str]) -> Card:
+def _budget_summary(ids: Mapping[str, str], options: Mapping[str, Any]) -> Card:
     """Return a markdown card that says whether the forecast covers the battery and the EV may share it."""
     need = ids["battery_need"]
     surplus = ids["forecast_surplus"]
+    active = ids.get("ev_first_active", "")
+    enabled = ids.get("ev_first_enabled", "")
+    margin = float(options.get(CONF_EV_FIRST_RELEASE_MARGIN_PERCENT, DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT))
     content = (
         f"{{% set need = states('{need}') | float(none) %}}"
         f"{{% set spare = states('{surplus}') | float(none) %}}"
@@ -256,8 +261,15 @@ def _budget_summary(ids: Mapping[str, str]) -> Card:
         "{% else %}"
         "{% set covered = [spare / need * 100, 100] | min if need > 0 else 100 %}"
         "**Forecast balance: {{ [covered, 0] | max | round(0) | int }}% covered**\n\n"
-        "{% if spare >= need %}✅ The forecast covers the battery, so the EV may share its charging power"
-        "{% else %}⏳ The battery comes first until the forecast catches up{% endif %}"
+        f"{{% if is_state('{active}', 'on') %}}"
+        "{% if need <= 0 %}Battery target reached; battery-first priority is off. Solar charging is available."
+        "{% else %}EV-first sharing is active; forecast surplus exceeds the battery's remaining need.{% endif %}"
+        f"{{% elif is_state('{enabled}', 'on') %}}"
+        "Battery-first mode is active. EV-first sharing is off; the EV may charge from sustained grid-export surplus. "
+        "EV-first sharing can resume when forecast surplus exceeds "
+        f"{{{{ (need * (1 + {margin} / 100)) | round(2) }}}} kWh "
+        f"(battery need plus the {margin:g}% restart margin)."
+        "{% else %}EV-first sharing is disabled; ordinary solar charging applies.{% endif %}"
         "{% endif %}"
     )
     return {"type": "markdown", "content": content, "grid_options": {"columns": 12}}

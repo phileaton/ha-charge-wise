@@ -35,7 +35,6 @@ _REQUIRED_ENTITY_DOMAINS = {
 }
 _CHARGER_OPTIONAL_DOMAINS = {
     CONF_HARDWARE_MAXIMUM_ENTITY: "number",
-    CONF_EV_CONNECTED_ENTITY: "binary_sensor",
 }
 _BATTERY_OPTIONAL_DOMAINS = {CONF_BATTERY_POWER_ENTITY: "sensor"}
 _FORECAST_OPTIONAL_DOMAINS = {
@@ -109,6 +108,15 @@ def validate_charger(
         return errors
     if errors := _validate_entities(hass, user_input, _CHARGER_OPTIONAL_DOMAINS, required=False):
         return errors
+
+    ev_entity = user_input.get(CONF_EV_CONNECTED_ENTITY)
+    if ev_entity:
+        entity_domain = ev_entity.split(".", maxsplit=1)[0]
+        if entity_domain not in ("binary_sensor", "sensor"):
+            return {"base": "invalid_entity"}
+        if hass.states.get(ev_entity) is None:
+            return {"base": "entity_not_found"}
+
     if errors := _validate_power_units(hass, user_input, (CONF_GRID_POWER_ENTITY, CONF_CHARGER_POWER_ENTITY)):
         return errors
 

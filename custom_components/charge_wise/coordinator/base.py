@@ -70,6 +70,7 @@ from custom_components.charge_wise.utils.charging_controller import (
     ControllerInput,
     ControllerStatus,
     ControlSettings,
+    solar_budget_w,
 )
 from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstInputs, EvFirstResult, evaluate_ev_first
 from custom_components.charge_wise.utils.forecast_accuracy import ForecastAccuracy
@@ -351,7 +352,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         if self._ev_first_enabled():
             self._ev_first_was_active = ev_first_active
         self._ev_first_store.async_delay_save(self._ev_first_as_dict, _HOUSE_LOAD_SAVE_DELAY_S)
-        readings = self._read_inputs(ev_first_active=ev_first_active)
+        readings = self._read_inputs(
+            ev_first_active=ev_first_active,
+            battery_reserve_w=ev_first_result.battery_reserve_w if ev_first_result else None,
+        )
         decision = self.controller.evaluate(settings, readings, now)
         self._log_decision_change(decision, readings)
         next_start_at = next_start(self.windows, local_now) if self.switches["offpeak_enabled"] else None
@@ -407,7 +411,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             available_solar_w=(
                 decision.available_solar_w
                 if decision.available_solar_w is not None
-                else self._available_solar_budget_w(ev_first_active)
+                else self._available_solar_budget_w(ev_first_active, ev_first_result)
             ),
             requested_current_a=decision.requested_current_a if requested_current_a is None else requested_current_a,
             manual_current_a=self.manual_current_a,
@@ -454,22 +458,25 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             return None
         return max(0.0, production + grid + battery - charger)
 
-    def _available_solar_budget_w(self, ev_first_active: bool) -> float | None:
-        """Return the live solar budget even when no Solar charging decision is active."""
-        grid = self._power_w(self.options[CONF_GRID_POWER_ENTITY])
-        charger = self._power_w(self.options[CONF_CHARGER_POWER_ENTITY])
-        if grid is None or charger is None:
-            return None
+    def _available_solar_budget_w(
+        self,
+        ev_first_active: bool,
+        ev_first_result: EvFirstResult | None = None,
+    ) -> float | None:
+        """Return the same battery-aware budget used for Solar charging decisions."""
+        return solar_budget_w(
+            self._read_inputs(
+                ev_first_active=ev_first_active,
+                battery_reserve_w=ev_first_result.battery_reserve_w if ev_first_result else None,
+            )
+        )
 
-        ev_first_boost_w = 0.0
-        if ev_first_active:
-            battery = self._battery_discharge_w()
-            if battery is None:
-                return None
-            ev_first_boost_w = max(0.0, -battery)
-        return max(0.0, charger - grid + ev_first_boost_w)
-
-    def _read_inputs(self, *, ev_first_active: bool = False) -> ControllerInput:
+    def _read_inputs(
+        self,
+        *,
+        ev_first_active: bool = False,
+        battery_reserve_w: float | None = None,
+    ) -> ControllerInput:
         """Read and normalize the currently configured Home Assistant entities."""
         battery_power = self._battery_discharge_w()
 
@@ -482,6 +489,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                     ev_connected = True
                 elif state.state == STATE_OFF:
                     ev_connected = False
+                elif state.state not in ("unavailable", "unknown"):
+                    ev_connected = state.state != "Available"
 
         ev_first_boost_w = max(0.0, -battery_power) if ev_first_active and battery_power is not None else 0.0
 
@@ -497,6 +506,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             hardware_maximum_a=self._number_value(self.options.get(CONF_HARDWARE_MAXIMUM_ENTITY)),
             ev_first_boost_w=ev_first_boost_w,
             ev_first_blocked=self._ev_first_enabled() and not ev_first_active,
+            battery_reserve_w=battery_reserve_w,
         )
 
     def _observe_forecast_accuracy(self, now: datetime) -> None:

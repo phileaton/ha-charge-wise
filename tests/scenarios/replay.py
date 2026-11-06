@@ -141,6 +141,7 @@ def _replay_day(
         else:
             accuracy.observe(now, solar, None)
 
+        evaluation = None
         if ev_first_config is not None:
             hours_left = (sunset - now).total_seconds() / 3600
             evaluation = evaluate_ev_first(
@@ -170,6 +171,7 @@ def _replay_day(
                 hardware_maximum_a=HARDWARE_MAXIMUM_A,
                 ev_first_boost_w=max(0.0, -battery_discharge) if ev_first_active else 0.0,
                 ev_first_blocked=ev_first_config is not None and not ev_first_active,
+                battery_reserve_w=evaluation.battery_reserve_w if evaluation else None,
             ),
             now,
         )
