@@ -68,14 +68,22 @@ seeded with the current reading, so the estimate is usable immediately and impro
 restarts and shown by the diagnostic **Average house consumption** sensor. The **learning window** (default 3 days)
 sets how quickly it adapts.
 
-**Battery target by sunset** (default 90 %) and **Forecast trust** (default 80 %) tune how cautious it is. Turn on the
-**EV-first charging** switch, which also needs **Solar charging**. Solar charging pauses while EV-first is inactive:
-when the trusted forecast, less expected house consumption until sunset, cannot cover the battery's remaining need.
-After EV-first activates, the **EV-first release margin** (default 25 %) keeps it active until the forecast surplus
-falls that far below the battery's need, preventing frequent on/off changes. While active, the Solar budget also
-includes power flowing into the battery (the **EV-first active** binary sensor shows this and the decision reason
-becomes EV first). If EV-first inputs or `sun.sun` are unavailable, Solar charging also pauses. Manual override and
-off-peak charging are unaffected. The EV never draws from the battery itself.
+**Battery target by sunset** (default 90 %) sets the battery's energy goal. Turn on **EV-first charging**,
+which also needs **Solar charging**. Forecast surplus means the trusted remaining forecast minus expected house
+consumption until sunset.
+
+EV-first sharing stops immediately when forecast surplus is at or below the battery's remaining need. A new sharing
+session requires surplus above battery need plus the **EV-first restart surplus margin** (default 25 %).
+
+When sharing is off, **battery-first mode** may still charge the EV from sustained grid export. The battery's charging
+power is excluded from this EV budget. An existing sharing session first releases its EV allocation unless genuine
+export is already evident, so the EV cannot retain power needed by the battery. Once an export-only session starts,
+its measured consumption is included in its budget; export falling toward zero as the EV consumes it does not itself
+stop charging. Battery discharge is excluded from that budget.
+
+Export-only starts still follow the configured Solar start threshold, start confirmation, and restart cooldown. A
+sustained shortage still follows the ordinary low-solar stop protection. Missing forecast inputs or daylight information
+block forecast-managed charging. Manual override and off-peak charging are unaffected.
 
 ## Controller options
 

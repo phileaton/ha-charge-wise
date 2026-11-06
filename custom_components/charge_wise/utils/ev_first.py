@@ -30,6 +30,7 @@ class EvFirstResult:
     battery_need_kwh: float
     forecast_surplus_kwh: float
     active: bool
+    battery_reserve_w: float = 0.0
 
 
 def evaluate_ev_first(
@@ -42,7 +43,7 @@ def evaluate_ev_first(
 
     forecast_accuracy is the measured share of the forecast that has actually materialised today (1.0 until known).
 
-    Once active, EV-first stays active until the surplus falls config.release_margin_percent below the need.
+    Active sharing stops at full battery coverage; the margin applies only when starting again.
     """
     if (
         inputs.forecast_remaining_kwh is None
@@ -58,5 +59,10 @@ def evaluate_ev_first(
     trusted_forecast_kwh = max(0.0, inputs.forecast_remaining_kwh) * inputs.forecast_accuracy
     house_use_kwh = max(0.0, inputs.house_use_kwh)
     surplus_kwh = trusted_forecast_kwh - house_use_kwh
-    threshold_kwh = battery_need_kwh * (1 - config.release_margin_percent / 100) if was_active else battery_need_kwh
-    return EvFirstResult(battery_need_kwh, surplus_kwh, surplus_kwh >= threshold_kwh)
+    threshold_kwh = battery_need_kwh if was_active else battery_need_kwh * (1 + config.release_margin_percent / 100)
+    return EvFirstResult(
+        battery_need_kwh,
+        surplus_kwh,
+        inputs.battery_level_percent >= 100 or surplus_kwh > threshold_kwh,
+        battery_need_kwh * 1000 / inputs.hours_until_sunset,
+    )
