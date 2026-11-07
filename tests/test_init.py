@@ -1,6 +1,7 @@
 """Tests for Charge Wise config-entry setup and cleanup."""
 
 from freezegun.api import FrozenDateTimeFactory
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.charge_wise.const import DOMAIN
@@ -30,6 +31,13 @@ async def _turn_on(hass: HomeAssistant, entry: MockConfigEntry, *keys: str) -> N
     await hass.async_block_till_done()
 
 
+async def _set_offpeak_current(hass: HomeAssistant, entry: MockConfigEntry, current: float) -> None:
+    """Set the off-peak current through the number service."""
+    entity_id = er.async_get(hass).async_get_entity_id("number", DOMAIN, f"{entry.entry_id}_offpeak_current")
+    assert entity_id is not None
+    await hass.services.async_call("number", "set_value", {"entity_id": entity_id, "value": current}, blocking=True)
+
+
 async def test_manual_override_enables_the_charger(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -54,10 +62,12 @@ async def test_manual_override_enables_the_charger(
     assert hass.states.get(status_entity).state == "charging"
 
 
+@pytest.mark.parametrize("offpeak_mode", ["on", "on_once"])
 async def test_offpeak_window_charges_from_the_grid_and_stops_outside_it(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     freezer: FrozenDateTimeFactory,
+    offpeak_mode: str,
 ) -> None:
     """Off-peak charging follows the configured local-time window."""
     commands: list[str] = []
@@ -78,12 +88,15 @@ async def test_offpeak_window_charges_from_the_grid_and_stops_outside_it(
     assert active_entity and status_entity and reason_entity and next_entity
 
     freezer.move_to("2026-01-07 11:00:00+00:00")
-    await _turn_on(hass, init_integration, "enabled", "offpeak_enabled")
+    await _turn_on(hass, init_integration, "enabled")
+    mode = er.async_get(hass).async_get_entity_id("select", DOMAIN, f"{init_integration.entry_id}_offpeak_mode")
+    await hass.services.async_call(
+        "select", "select_option", {"entity_id": mode, "option": offpeak_mode}, blocking=True
+    )
     freezer.tick(31)
     hass.services.async_register("switch", "turn_on", turn_on)
     hass.services.async_register("switch", "turn_off", turn_off)
-    coordinator = init_integration.runtime_data.coordinator
-    await coordinator.async_set_offpeak_current(10)
+    await _set_offpeak_current(hass, init_integration, 10)
     await hass.async_block_till_done()
 
     assert hass.states.get(active_entity).state == "on"
@@ -92,14 +105,15 @@ async def test_offpeak_window_charges_from_the_grid_and_stops_outside_it(
     assert hass.states.get("switch.charger_enable").state == "on"
 
     freezer.move_to("2026-01-07 15:00:00+00:00")
-    await coordinator.async_set_offpeak_current(11)
+    await _set_offpeak_current(hass, init_integration, 11)
     await hass.async_block_till_done()
 
     assert hass.states.get(active_entity).state == "off"
-    assert hass.states.get(status_entity).state == "waiting"
-    assert hass.states.get(reason_entity).state == "offpeak_waiting"
+    assert hass.states.get(status_entity).state == ("waiting" if offpeak_mode == "on" else "off")
+    assert hass.states.get(reason_entity).state == ("offpeak_waiting" if offpeak_mode == "on" else "no_source")
     assert hass.states.get("switch.charger_enable").state == "off"
-    assert hass.states.get(next_entity).state == "2026-01-08T08:00:00+00:00"
+    assert hass.states.get(next_entity).state == ("2026-01-08T08:00:00+00:00" if offpeak_mode == "on" else "unknown")
+    assert hass.states.get(mode).state == ("on" if offpeak_mode == "on" else "off")
 
 
 async def test_pending_switch_command_is_not_repeated(
@@ -117,18 +131,19 @@ async def test_pending_switch_command_is_not_repeated(
         commands.append("off")
 
     freezer.move_to("2026-01-07 11:00:00+00:00")
-    await _turn_on(hass, init_integration, "enabled", "offpeak_enabled")
+    await _turn_on(hass, init_integration, "enabled")
+    mode = er.async_get(hass).async_get_entity_id("select", DOMAIN, f"{init_integration.entry_id}_offpeak_mode")
+    await hass.services.async_call("select", "select_option", {"entity_id": mode, "option": "on"}, blocking=True)
     freezer.tick(31)
     hass.services.async_register("switch", "turn_on", turn_on)
     hass.services.async_register("switch", "turn_off", turn_off)
-    coordinator = init_integration.runtime_data.coordinator
     for current in (10, 11, 12):
-        await coordinator.async_set_offpeak_current(current)
+        await _set_offpeak_current(hass, init_integration, current)
     await hass.async_block_till_done()
     assert commands == ["on"]
 
     freezer.tick(31)
-    await coordinator.async_set_offpeak_current(13)
+    await _set_offpeak_current(hass, init_integration, 13)
     await hass.async_block_till_done()
     assert commands == ["on", "on"]
 

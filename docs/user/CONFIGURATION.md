@@ -64,7 +64,7 @@ connected but not drawing power from a disconnected vehicle. Unknown readings re
 
 ## Charging sources
 
-Four switches control what Charge Wise does. All start off on a new entry.
+Switches and an off-peak mode control what Charge Wise does. All start off on a new entry.
 
 - **Charging enabled** is the master switch. While it is off, nothing is charged.
 - **Solar charging** calculates available solar headroom as `max(0, measured charger power - net grid power)`. It
@@ -78,8 +78,16 @@ Four switches control what Charge Wise does. All start off on a new entry.
 Solar and off-peak can be on together. Inside a window the higher of the two requested currents wins, and Solar wins a
 tie. Outside a window Solar runs as usual.
 
-The switch states are restored after a Home Assistant restart. A restored Solar source is checked against current
+The switch states and off-peak mode are restored after a Home Assistant restart. A restored Solar source is checked against current
 sensor values and held through the restart cooldown before it can start.
+
+Off-peak charging has three modes: **Off**, **On** for recurring scheduled charging, and **On once**.
+On once uses the current off-peak period if one is active, otherwise the next period, and returns to Off when that
+period ends. Its original end time survives restarts; restarting after that time leaves it Off. On once requires a
+configured window. Overlapping or adjacent windows count as one continuous period.
+
+The off-peak mode dropdown replaces the previous off-peak charging switch. Update automations that targeted that switch
+to use `select.select_option` with `off`, `on`, or `on_once`.
 
 ## Off-peak windows
 
@@ -161,7 +169,8 @@ protection binary sensor is created only when a battery-power entity is configur
 
 Each entry creates:
 
-- **Charging enabled**, **Solar charging**, **Off-peak charging**, **Manual override** and **EV-first charging** switches.
+- **Charging enabled**, **Solar charging**, **Manual override** and **EV-first charging** switches, and an
+  **Off-peak charging** dropdown.
 - **Manual current** and **Off-peak current** numbers. On first install both start at the charger maximum; after that
   they keep their last value across restarts.
 - **Controller status** sensor with the stable states Off, Waiting, Charging, Paused, and Error.

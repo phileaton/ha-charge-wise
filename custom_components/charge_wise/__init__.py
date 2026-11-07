@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.NUMBER,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
 ]
@@ -55,6 +56,9 @@ async def async_setup_entry(
     registry = er.async_get(hass)
     if stale_mode := registry.async_get_entity_id("select", DOMAIN, f"{entry.entry_id}_mode"):
         registry.async_remove(stale_mode)
+
+    if stale_offpeak := registry.async_get_entity_id("switch", DOMAIN, f"{entry.entry_id}_offpeak_enabled"):
+        registry.async_remove(stale_offpeak)
 
     coordinator = ChargeWiseDataUpdateCoordinator(hass, entry)
     entry.runtime_data = ChargeWiseData(coordinator=coordinator)

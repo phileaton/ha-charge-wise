@@ -23,6 +23,7 @@ class ChargeWiseSnapshot:
     enabled: bool
     solar_enabled: bool
     offpeak_enabled: bool
+    offpeak_mode: str
     manual_override: bool
     ev_first_enabled: bool
     ev_first_active: bool

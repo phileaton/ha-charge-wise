@@ -67,14 +67,16 @@
           "off": "mdi:solar-power-variant-outline"
         }
       },
-      "offpeak_enabled": {
-        "default": "mdi:clock-time-three-outline"
-      },
       "manual_override": {
         "default": "mdi:hand-back-right"
       },
       "ev_first_enabled": {
         "default": "mdi:car-electric-outline"
+      }
+    },
+    "select": {
+      "offpeak_mode": {
+        "default": "mdi:clock-time-three-outline"
       }
     }
   }

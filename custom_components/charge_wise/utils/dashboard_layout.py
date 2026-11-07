@@ -259,7 +259,7 @@ def _budget_section(ids: Mapping[str, str], options: Mapping[str, Any]) -> list[
         cards.append(_budget_summary(ids, options))
     if "next_offpeak_window" in ids:
         window = ids["next_offpeak_window"]
-        enabled = ids.get("offpeak_enabled")
+        enabled = ids.get("offpeak_mode")
         content = ""
         if enabled:
             content += f"{{% if is_state('{enabled}', 'off') %}}Off-peak charging is disabled.{{% else %}}"
@@ -406,19 +406,24 @@ def _controls_section(ids: Mapping[str, str], control_keys: tuple[str, ...]) -> 
         "enabled": "Charging enabled",
         "solar_enabled": "Solar charging",
         "ev_first_enabled": "EV-first charging",
-        "offpeak_enabled": "Off-peak charging",
+        "offpeak_mode": "Off-peak charging",
         "manual_override": "Manual override",
         "manual_current": "Manual current",
         "offpeak_current": "Off-peak current",
     }
-    modes = {"manual_current": "manual_override", "offpeak_current": "offpeak_enabled"}
+    modes = {"manual_current": "manual_override", "offpeak_current": "offpeak_mode"}
     rows: list[Card] = []
     for key in control_keys:
         if key not in ids:
             continue
         row: Card = {"entity": ids[key], "name": names[key]}
         if key in modes and modes[key] in ids:
-            row = {"type": "conditional", "conditions": [{"entity": ids[modes[key]], "state": "on"}], "row": row}
+            condition = (
+                {"entity": ids[modes[key]], "state_not": "off"}
+                if key == "offpeak_current"
+                else {"entity": ids[modes[key]], "state": "on"}
+            )
+            row = {"type": "conditional", "conditions": [condition], "row": row}
         rows.append(row)
     return [
         _heading("Controls", "mdi:tune-variant"),

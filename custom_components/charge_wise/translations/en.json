@@ -341,6 +341,12 @@
     },
     "ev_first_not_configured": {
       "message": "EV-first charging needs the forecast, battery level, house consumption and battery capacity configured in the options."
+    },
+    "offpeak_schedule_required": {
+      "message": "Configure an off-peak window before selecting On once."
+    },
+    "invalid_offpeak_mode": {
+      "message": "Choose Off, On, or On once."
     }
   },
   "entity": {
@@ -469,14 +475,21 @@
       "solar_enabled": {
         "name": "Solar charging"
       },
-      "offpeak_enabled": {
-        "name": "Off-peak charging"
-      },
       "manual_override": {
         "name": "Manual override"
       },
       "ev_first_enabled": {
         "name": "EV-first charging"
+      }
+    },
+    "select": {
+      "offpeak_mode": {
+        "name": "Off-peak charging",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "on_once": "On once"
+        }
       }
     }
   },

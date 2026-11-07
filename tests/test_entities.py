@@ -41,9 +41,11 @@ async def test_setup_exposes_the_charge_wise_control_surface(
 ) -> None:
     """The configured entry creates translated control and diagnostic entities."""
     switch_entities = [
-        _entity_id(hass, init_integration, "switch", key)
-        for key in ("enabled", "solar_enabled", "offpeak_enabled", "manual_override")
+        _entity_id(hass, init_integration, "switch", key) for key in ("enabled", "solar_enabled", "manual_override")
     ]
+    mode = _entity_id(hass, init_integration, "select", "offpeak_mode")
+    assert hass.states.get(mode).state == "off"
+    assert hass.states.get(mode).attributes["options"] == ["off", "on", "on_once"]
     offpeak_number = _entity_id(hass, init_integration, "number", "offpeak_current")
     next_window = _entity_id(hass, init_integration, "sensor", "next_offpeak_window")
     offpeak_active = _entity_id(hass, init_integration, "binary_sensor", "offpeak_active")

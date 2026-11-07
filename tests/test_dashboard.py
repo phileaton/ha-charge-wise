@@ -129,7 +129,11 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert any(row.get("entity", "").startswith("switch.test_charger") for row in controls["entities"])
     conditional = [row for row in controls["entities"] if row.get("type") == "conditional"]
     assert {row["row"]["name"] for row in conditional} == {"Manual current", "Off-peak current"}
-    assert all(row["conditions"][0]["state"] == "on" for row in conditional)
+    assert any(row.get("entity", "").startswith("select.test_charger") for row in controls["entities"])
+    conditions = {row["row"]["name"]: row["conditions"][0] for row in conditional}
+    assert conditions["Manual current"]["state"] == "on"
+    assert conditions["Off-peak current"]["state_not"] == "off"
+    assert conditions["Off-peak current"]["entity"].startswith("select.")
     assert sum(card["type"] == "gauge" for card in cards) == 2
     assert chart["grid_options"] == {"columns": "full", "rows": 6}
     assert chart["section_mode"] is True

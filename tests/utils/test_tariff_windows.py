@@ -8,6 +8,7 @@ from custom_components.charge_wise.utils.tariff_windows import (
     WindowDays,
     is_active,
     next_change,
+    next_period_end,
     next_start,
 )
 
@@ -65,3 +66,22 @@ def test_dst_spring_forward_keeps_the_window_end_in_wall_clock_time() -> None:
     now = datetime(2026, 3, 8, 1, 0, tzinfo=LA)
 
     assert next_change([NIGHT], now) == datetime(2026, 3, 8, 6, 0, tzinfo=LA).astimezone(UTC)
+
+
+def test_period_end_uses_current_or_next_window() -> None:
+    """Before, during and after a window, the deadline belongs to the first available period."""
+    assert next_period_end([NIGHT], datetime(2026, 3, 4, 3, tzinfo=LA)) == datetime(2026, 3, 4, 6, tzinfo=LA)
+    assert next_period_end([NIGHT], datetime(2026, 3, 4, 6, tzinfo=LA)) == datetime(2026, 3, 5, 6, tzinfo=LA)
+    assert next_period_end([], datetime(2026, 3, 4, 3, tzinfo=LA)) is None
+
+
+def test_period_end_crosses_midnight_and_spring_dst() -> None:
+    """The expiry remains at local wall-clock time across midnight and daylight saving changes."""
+    assert next_period_end([EVENING], datetime(2026, 3, 5, 1, tzinfo=LA)) == datetime(2026, 3, 5, 2, tzinfo=LA)
+    assert next_period_end([NIGHT], datetime(2026, 3, 8, 1, tzinfo=LA)) == datetime(2026, 3, 8, 6, tzinfo=LA)
+
+
+def test_period_end_merges_overlapping_and_adjacent_windows() -> None:
+    """Continuous cheap-rate hours count as a single one-time charging period."""
+    windows = [NIGHT, TariffWindow(time(5), time(7)), TariffWindow(time(7), time(8))]
+    assert next_period_end(windows, datetime(2026, 3, 4, 3, tzinfo=LA)) == datetime(2026, 3, 4, 8, tzinfo=LA)

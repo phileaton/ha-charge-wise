@@ -84,7 +84,13 @@ from custom_components.charge_wise.utils.charging_controller import (
 from custom_components.charge_wise.utils.ev_first import EvFirstConfig, EvFirstInputs, EvFirstResult, evaluate_ev_first
 from custom_components.charge_wise.utils.forecast_accuracy import ForecastAccuracy
 from custom_components.charge_wise.utils.house_load import HouseLoadProfile
-from custom_components.charge_wise.utils.tariff_windows import is_active, next_change, next_start, windows_from_options
+from custom_components.charge_wise.utils.tariff_windows import (
+    is_active,
+    next_change,
+    next_period_end,
+    next_start,
+    windows_from_options,
+)
 from homeassistant.components.recorder.history import state_changes_during_period
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -116,7 +122,7 @@ _ENERGY_FACTORS_KWH: dict[str, float] = {
 
 SWITCH_COMMAND_GRACE_S = 30
 
-type SwitchKey = Literal["enabled", "solar_enabled", "offpeak_enabled", "manual_override", "ev_first_enabled"]
+type SwitchKey = Literal["enabled", "solar_enabled", "manual_override", "ev_first_enabled"]
 
 
 class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot]):
@@ -129,12 +135,14 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self.switches: dict[SwitchKey, bool] = {
             "enabled": False,
             "solar_enabled": False,
-            "offpeak_enabled": False,
             "manual_override": False,
             "ev_first_enabled": False,
         }
         self.manual_current_a = float(self.options[CONF_MINIMUM_CURRENT_A])
         self.offpeak_current_a = self.manual_current_a
+        self.offpeak_mode = "off"
+        self._offpeak_until: datetime | None = None
+        self._offpeak_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.offpeak")
         self.windows = windows_from_options(self.options.get(CONF_OFFPEAK_WINDOWS))
         self.ev_first_config = self._ev_first_config_from_options()
         self._ev_first_was_active = False
@@ -191,6 +199,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             enabled=False,
             solar_enabled=False,
             offpeak_enabled=False,
+            offpeak_mode="off",
             manual_override=False,
             ev_first_enabled=False,
             ev_first_active=False,
@@ -235,6 +244,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 energy_counter=bool(self.options.get(CONF_SOLAR_ENERGY_ENTITY)),
             )
             await self._async_anchor_accuracy_to_midnight()
+        self._restore_offpeak(await self._offpeak_store.async_load())
         self._state_unsub = async_track_state_change_event(
             self.hass,
             entity_ids,
@@ -310,6 +320,41 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self.controller.start_cooldown(dt_util.utcnow())
         await self._async_evaluate()
 
+    def _restore_offpeak(self, stored: dict[str, Any] | None) -> None:
+        """Restore the selected mode without extending a one-time request."""
+        if not stored:
+            return
+        mode = stored.get("mode")
+        if mode == "on":
+            self.offpeak_mode = "on"
+        elif mode == "on_once":
+            value = stored.get("until")
+            until = dt_util.parse_datetime(value) if isinstance(value, str) else None
+            if until is not None and until.tzinfo is not None and until > dt_util.utcnow():
+                self.offpeak_mode = "on_once"
+                self._offpeak_until = until
+        if self.offpeak_mode != "off":
+            self.controller.start_cooldown(dt_util.utcnow())
+
+    async def _async_save_offpeak(self) -> None:
+        """Persist the mode and its original deadline immediately."""
+        await self._offpeak_store.async_save(
+            {"mode": self.offpeak_mode, "until": self._offpeak_until.isoformat() if self._offpeak_until else None},
+        )
+
+    async def async_set_offpeak_mode(self, mode: str) -> None:
+        """Select recurring or one-time off-peak charging."""
+        if mode not in {"off", "on", "on_once"}:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="invalid_offpeak_mode")
+        async with self._evaluation_lock:
+            until = next_period_end(self.windows, dt_util.now()) if mode == "on_once" else None
+            if mode == "on_once" and until is None:
+                raise ServiceValidationError(translation_domain=DOMAIN, translation_key="offpeak_schedule_required")
+            self.offpeak_mode = mode
+            self._offpeak_until = until
+            await self._async_save_offpeak()
+            await self._async_evaluate_locked()
+
     @property
     def maximum_current_a(self) -> float:
         """Return the configured maximum, lowered to the live hardware maximum when available."""
@@ -347,12 +392,16 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Calculate, apply, and publish one controller decision at a time."""
         now = dt_util.utcnow()
         local_now = dt_util.as_local(now)
+        if self._offpeak_until is not None and now >= self._offpeak_until:
+            self.offpeak_mode = "off"
+            self._offpeak_until = None
+            await self._async_save_offpeak()
         self._observe_house_load(now)
-        offpeak_active = self.switches["offpeak_enabled"] and is_active(self.windows, local_now)
+        offpeak_active = (self.offpeak_mode != "off") and is_active(self.windows, local_now)
         settings = ControlSettings(
             enabled=self.switches["enabled"],
             solar_enabled=self.switches["solar_enabled"],
-            offpeak_enabled=self.switches["offpeak_enabled"],
+            offpeak_enabled=(self.offpeak_mode != "off"),
             manual_override=self.switches["manual_override"],
             manual_current_a=self.manual_current_a,
             offpeak_current_a=self.offpeak_current_a,
@@ -371,7 +420,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         )
         decision = self.controller.evaluate(settings, readings, now)
         self._log_decision_change(decision, readings)
-        next_start_at = next_start(self.windows, local_now) if self.switches["offpeak_enabled"] else None
+        next_start_at = next_start(self.windows, local_now) if (self.offpeak_mode != "off") else None
         try:
             await self._async_apply_decision(decision)
         except HomeAssistantError:
@@ -389,7 +438,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                     requested_current_a=0.0,
                 ),
             )
-            self._cancel_timer()
+            self._schedule_timer(decision)
             return
 
         self.async_set_updated_data(
@@ -411,9 +460,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
     ) -> ChargeWiseSnapshot:
         """Combine a controller decision with user switches for entities."""
         return ChargeWiseSnapshot(
+            offpeak_mode=self.offpeak_mode,
             enabled=self.switches["enabled"],
             solar_enabled=self.switches["solar_enabled"],
-            offpeak_enabled=self.switches["offpeak_enabled"],
+            offpeak_enabled=(self.offpeak_mode != "off"),
             manual_override=self.switches["manual_override"],
             ev_first_enabled=self.switches["ev_first_enabled"],
             ev_first_active=ev_first_active,
@@ -757,9 +807,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
     def _schedule_timer(self, decision: ControllerDecision) -> None:
         """Schedule only the next required confirmation or cooldown evaluation."""
         self._cancel_timer()
-        if decision.next_update_at is None:
+        deadlines = [value for value in (decision.next_update_at, self._offpeak_until) if value is not None]
+        if not deadlines:
             return
-        delay = max(0.0, (decision.next_update_at - dt_util.utcnow()).total_seconds())
+        delay = max(0.0, (min(deadlines) - dt_util.utcnow()).total_seconds())
         if delay:
             self._timer_unsub = async_call_later(self.hass, delay, self._handle_timer)
 

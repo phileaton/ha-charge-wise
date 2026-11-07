@@ -82,3 +82,14 @@ def next_start(windows: Sequence[TariffWindow], now: datetime) -> datetime | Non
     """Return the next UTC time a window starts."""
     starts = [start for start, _ in _intervals(windows, now) if start > now]
     return min(starts) if starts else None
+
+
+def next_period_end(windows: Sequence[TariffWindow], now: datetime) -> datetime | None:
+    """Return the UTC end of the active or next continuous off-peak period."""
+    periods: list[tuple[datetime, datetime]] = []
+    for start, end in sorted(_intervals(windows, now)):
+        if periods and start <= periods[-1][1]:
+            periods[-1] = (periods[-1][0], max(periods[-1][1], end))
+        else:
+            periods.append((start, end))
+    return next((end for _, end in periods if end > now), None)

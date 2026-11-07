@@ -20,11 +20,6 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSwitchEntityDescription, ...] = (
     ChargeWiseSwitchEntityDescription(key="enabled", translation_key="enabled", switch_key="enabled"),
     ChargeWiseSwitchEntityDescription(key="solar_enabled", translation_key="solar_enabled", switch_key="solar_enabled"),
     ChargeWiseSwitchEntityDescription(
-        key="offpeak_enabled",
-        translation_key="offpeak_enabled",
-        switch_key="offpeak_enabled",
-    ),
-    ChargeWiseSwitchEntityDescription(
         key="manual_override",
         translation_key="manual_override",
         switch_key="manual_override",

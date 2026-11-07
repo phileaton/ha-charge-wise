@@ -29,7 +29,7 @@ _CONTROLS = (
     ("switch", "enabled"),
     ("switch", "solar_enabled"),
     ("switch", "ev_first_enabled"),
-    ("switch", "offpeak_enabled"),
+    ("select", "offpeak_mode"),
     ("switch", "manual_override"),
     ("number", "manual_current"),
     ("number", "offpeak_current"),
