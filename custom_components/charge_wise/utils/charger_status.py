@@ -84,8 +84,8 @@ def classify_status(
 ) -> ChargerObservation:
     """Interpret only statuses with an established meaning for the selected profile.
 
-    OCPP Finishing and Unavailable do not establish physical connection. Wallbox
-    Disconnected describes communication loss and is likewise left unknown.
+    OCPP Finishing keeps the vehicle connected after a session ends. OCPP
+    Unavailable and Wallbox Disconnected leave physical connection unknown.
     """
     if value is None or normalize_status(value) in _RESERVED:
         return ChargerObservation(profile=profile, raw_status=value)
@@ -98,8 +98,6 @@ def classify_status(
         }
     session = mapping.get(normalize_status(value))
     connected = None if session in (None, ChargerSessionStatus.FAULT) else session != ChargerSessionStatus.DISCONNECTED
-    if profile == "ocpp" and normalize_status(value) == "finishing":
-        connected = None
     charging = None if session in (None, ChargerSessionStatus.FAULT) else session == ChargerSessionStatus.CHARGING
     if profile == "ocpp" and normalize_status(value) == "preparing":
         charging = None

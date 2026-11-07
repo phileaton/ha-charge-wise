@@ -49,8 +49,8 @@ unplugged vehicle or completed session. Status supplies charging activity only w
 measured charger power remains required by setup and solar control.
 
 Charger session describes what the status sensor reports, independently of measured activity. Finished means an
-explicitly ended session, not a full battery. OCPP Finishing reports session completion but leaves physical connection
-unknown. Source details are available on the session sensor and in diagnostics. Cloud status can lag local updates;
+explicitly ended session, not a full battery. OCPP Finishing reports session completion while keeping the vehicle connected;
+Available reports disconnection. Source details are available on the session sensor and in diagnostics. Cloud status can lag local updates;
 there is no automatic stale-reading timeout.
 
 ## Actual draw and requested limit

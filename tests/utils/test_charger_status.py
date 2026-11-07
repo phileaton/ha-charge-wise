@@ -17,7 +17,7 @@ from custom_components.charge_wise.utils.charger_status import (
         ("ocpp", "Charging", True, "charging"),
         ("ocpp", "SuspendedEV", True, "paused"),
         ("ocpp", "SuspendedEVSE", True, "paused"),
-        ("ocpp", "Finishing", None, "finished"),
+        ("ocpp", "Finishing", True, "finished"),
         ("ocpp", "Reserved", None, None),
         ("ocpp", "Faulted", None, "fault"),
         ("wallbox", "Locked", False, "disconnected"),
@@ -80,3 +80,15 @@ def test_charging_hysteresis_and_invalid_measurement() -> None:
         assert detector.update(200) is True
         assert detector.update(value) is None
         assert detector.update(75) is None
+
+
+def test_ocpp_stopped_session_remains_connected_until_unplugged() -> None:
+    """Stopping the transaction does not disconnect a vehicle still occupying the connector."""
+    stopped = classify_status("Finishing", "ocpp")
+    assert stopped.connected is True
+    assert stopped.charging is False
+    assert stopped.session == "finished"
+    unplugged = classify_status("Available", "ocpp")
+    assert unplugged.connected is False
+    assert unplugged.charging is False
+    assert unplugged.session == "disconnected"
