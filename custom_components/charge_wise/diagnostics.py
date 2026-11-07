@@ -4,6 +4,7 @@ Diagnostics support for charge_wise.
 https://developers.home-assistant.io/docs/core/integration_diagnostics
 """
 
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -48,6 +49,6 @@ async def async_get_config_entry_diagnostics(
             "last_update_success": coordinator.last_update_success,
             "update_interval": str(coordinator.update_interval),
             "last_exception": str(coordinator.last_exception) if coordinator.last_exception else None,
-            "data": async_redact_data(coordinator.data, TO_REDACT),
+            "data": async_redact_data(asdict(coordinator.data), TO_REDACT),
         },
     }

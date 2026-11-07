@@ -12,6 +12,7 @@ from custom_components.charge_wise.const import (
     CONF_HARDWARE_MAXIMUM_ENTITY,
     DOMAIN,
 )
+from custom_components.charge_wise.diagnostics import async_get_config_entry_diagnostics
 from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
@@ -226,3 +227,146 @@ async def test_current_numbers_keep_their_prior_value_across_restarts(
 
     assert float(hass.states.get(entity_ids["manual_current"]).state) == 10
     assert float(hass.states.get(entity_ids["offpeak_current"]).state) == 12
+
+
+@pytest.mark.parametrize(("profile", "raw", "expected"), [("ocpp", "Preparing", "on"), ("wallbox", "Locked", "off")])
+async def test_charger_status_drives_connection_without_commands(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    profile: str,
+    raw: str,
+    expected: str,
+) -> None:
+    """Status updates work while control is off and power does not imply unplugging."""
+    options = dict(config_entry.options)
+    options.pop("ev_connected_entity")
+    options.update(charger_status_entity="sensor.status", charger_status_profile=profile)
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(config_entry, options=options)
+    hass.states.async_set("sensor.status", raw)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    connected = _entity_id(hass, config_entry, "binary_sensor", "vehicle_connected")
+    charging = _entity_id(hass, config_entry, "binary_sensor", "vehicle_charging")
+    session = _entity_id(hass, config_entry, "sensor", "charger_session")
+    assert hass.states.get(connected).state == expected
+    assert hass.states.get(charging).state == "off"
+    assert hass.states.get(session).attributes["profile"] == profile
+    hass.states.async_set("sensor.status", "Charging")
+    await hass.async_block_till_done()
+    assert hass.states.get(connected).state == "on"
+    assert hass.states.get(charging).state == "off"
+    _set_power(hass, "sensor.charger_power", 0.2, "kW")
+    await hass.async_block_till_done()
+    assert hass.states.get(charging).state == "on"
+    _set_power(hass, "sensor.charger_power", 75)
+    await hass.async_block_till_done()
+    assert hass.states.get(charging).state == "on"
+    hass.states.async_set("sensor.charger_power", "unavailable")
+    hass.states.async_set("sensor.status", "unavailable")
+    await hass.async_block_till_done()
+    assert hass.states.get(connected).state == "unknown"
+    assert hass.states.get(charging).state == "unknown"
+    assert hass.states.get(session).state == "unknown"
+
+
+async def test_unified_status_replaces_legacy_connection(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """The unified source ignores a stale legacy selection in an existing entry."""
+    options = {**config_entry.options, "charger_status_entity": "sensor.status", "charger_status_profile": "wallbox"}
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(config_entry, options=options)
+    hass.states.async_set("sensor.status", "Locked")
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    entity = _entity_id(hass, config_entry, "binary_sensor", "vehicle_connected")
+    assert hass.states.get(entity).state == "off"
+    hass.states.async_set("binary_sensor.ev_connected", "unavailable")
+    hass.states.async_set("sensor.status", "Locked, car connected")
+    await hass.async_block_till_done()
+    assert hass.states.get(entity).state == "on"
+
+
+@pytest.mark.parametrize("supplier", ["ocpp", "wallbox"])
+async def test_automatic_profile_uses_entity_registry(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    supplier: str,
+) -> None:
+    """Automatic profile follows the supplying integration rather than the entity name."""
+    status = er.async_get(hass).async_get_or_create("sensor", supplier, "test-status")
+    hass.states.async_set(status.entity_id, "Charging")
+    config_entry.add_to_hass(hass)
+    options = {**config_entry.options, "charger_status_entity": status.entity_id, "charger_status_profile": "auto"}
+    options.pop("ev_connected_entity")
+    hass.config_entries.async_update_entry(config_entry, options=options)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    session = _entity_id(hass, config_entry, "sensor", "charger_session")
+    assert hass.states.get(session).state == "charging"
+    assert hass.states.get(session).attributes["profile"] == supplier
+
+
+async def test_legacy_ocpp_mapping_pauses_on_unknown_status(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Old string selections still detect OCPP and stop treating arbitrary strings as connected."""
+    config_entry.add_to_hass(hass)
+    options = {**config_entry.options, "ev_connected_entity": "sensor.legacy_status"}
+    hass.config_entries.async_update_entry(config_entry, options=options)
+    hass.states.async_set("sensor.legacy_status", "Preparing")
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    connection = _entity_id(hass, config_entry, "binary_sensor", "vehicle_connected")
+    assert hass.states.get(connection).state == "on"
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {
+            "entity_id": _entity_id(hass, config_entry, "switch", "enabled"),
+        },
+        blocking=True,
+    )
+    hass.states.async_set("sensor.legacy_status", "Locked")
+    await hass.async_block_till_done()
+    assert hass.states.get(connection).state == "unknown"
+    reason = _entity_id(hass, config_entry, "sensor", "decision_reason")
+    assert hass.states.get(reason).state == "ev_status_unavailable"
+
+
+async def test_diagnostics_include_serializable_observations(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Diagnostics expose source evidence as a mapping that can be downloaded."""
+    result = await async_get_config_entry_diagnostics(hass, init_integration)
+    assert result["coordinator"]["data"]["vehicle_connected"] is True
+    assert result["coordinator"]["data"]["charger_connection_source"] == "binary_sensor.ev_connected"
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("on", "on"), ("off", "off"), ("unavailable", "unknown")])
+async def test_unified_binary_source_has_unknown_session(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    raw: str,
+    expected: str,
+) -> None:
+    """Binary sources report only connection; profile selection cannot add session evidence."""
+    config_entry.add_to_hass(hass)
+    options = {
+        **config_entry.options,
+        "charger_status_entity": "binary_sensor.ev_connected",
+        "charger_status_profile": "custom",
+    }
+    hass.config_entries.async_update_entry(config_entry, options=options)
+    hass.states.async_set("binary_sensor.ev_connected", raw)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    connected = _entity_id(hass, config_entry, "binary_sensor", "vehicle_connected")
+    session = _entity_id(hass, config_entry, "sensor", "charger_session")
+    assert hass.states.get(connected).state == expected
+    assert hass.states.get(session).state == "unknown"
+    assert hass.states.get(session).attributes["profile"] == "binary"

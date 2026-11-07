@@ -11,20 +11,56 @@ forms have no Back button, so pages 2 to 5 end with a **Go back to the previous 
 
 ## Entity inputs
 
-| Input                    | Required | Expected entity/value                                                    |
-| ------------------------ | -------- | ------------------------------------------------------------------------ |
-| Net grid power           | Yes      | Sensor in mW, W, or kW; import positive, export negative                 |
-| Measured charger power   | Yes      | Sensor in mW, W, or kW                                                   |
-| Charger control          | Yes      | Switch used to start or stop charging                                    |
-| Active current target    | Yes      | Writable number entity in amperes                                        |
-| Safe maximum current     | Yes      | Explicit current limit that always caps requests                         |
-| Hardware maximum current | No       | Read-only number entity; applies an additional, lower cap when available |
-| Battery power            | No       | Power sensor; configure whether discharge is positive or negative        |
-| EV connected             | No       | Binary sensor; charging is held unless it reports on                     |
+| Input                       | Required | Expected entity/value                                                    |
+| --------------------------- | -------- | ------------------------------------------------------------------------ |
+| Net grid power              | Yes      | Sensor in mW, W, or kW; import positive, export negative                 |
+| Measured charger power      | Yes      | Sensor in mW, W, or kW                                                   |
+| Charger control             | Yes      | Switch used to start or stop charging                                    |
+| Active current target       | Yes      | Writable number entity in amperes                                        |
+| Safe maximum current        | Yes      | Explicit current limit that always caps requests                         |
+| Hardware maximum current    | No       | Read-only number entity; applies an additional, lower cap when available |
+| Battery power               | No       | Power sensor; configure whether discharge is positive or negative        |
+| Charger status / connection | No       | Binary connection sensor, or status sensor with a profile                |
 
 The safe maximum is required even if a hardware-maximum entity is selected. If that optional entity becomes
 unavailable, the configured safe maximum still applies. Multiple Charge Wise entries may share measurement sensors,
 but cannot share a charger switch or active current target.
+
+## Charger status and connection
+
+Select the charger status sensor and its profile on the Charger page. Automatic recognizes sensors supplied by the
+OCPP and Wallbox integrations; other integrations need an explicit profile or Custom mappings. For your own sensor,
+enter each reported value in exactly one custom group: disconnected, idle (connected), charging, paused, finished or
+fault. Matching ignores surrounding whitespace and case. Leave uncertain statuses unmapped.
+
+Use this single field for either type of source. A binary sensor reports connection through on/off; it does not
+provide session status, and the profile is ignored. A string status sensor uses the selected profile for both
+connection and session information. Older saved connection selections remain readable until the options are saved;
+if both old fields were configured, the charger status selection is used. Saving Configure stores the single source.
+
+OCPP Available means disconnected and Preparing means connected. Wallbox Locked means disconnected, while
+Locked, car connected means connected. Unsupported values and fault or unavailable statuses do not establish a
+connection. This replaces the previous assumption that any string except Available meant connected; existing
+installations using arbitrary status strings must configure a profile or select a binary connection sensor.
+
+Vehicle charging uses measured power: at least 100 W turns it on, at most 50 W turns it off, and values between
+retain the previous valid observation. Missing or invalid power resets it to unknown. Zero power never implies an
+unplugged vehicle or completed session. Status supplies charging activity only when no power sensor is configured;
+measured charger power remains required by setup and solar control.
+
+Charger session describes what the status sensor reports, independently of measured activity. Finished means an
+explicitly ended session, not a full battery. OCPP Finishing reports session completion but leaves physical connection
+unknown. Source details are available on the session sensor and in diagnostics. Cloud status can lag local updates;
+there is no automatic stale-reading timeout.
+
+## Actual draw and requested limit
+
+The charging gauge shows **Actual current** when an optional measured charger-current sensor in A is selected.
+Use measured current, not offered current or a current-limit entity. Without a measured-current sensor, the gauge
+shows **Actual charging power** in the power sensor's unit; amps are never estimated from watts.
+The requested current limit remains visible below the gauge and as its existing sensor. A 40 A request permits
+charging up to that limit; a connected vehicle can still draw 0 A. The observed activity message distinguishes
+connected but not drawing power from a disconnected vehicle. Unknown readings remain unknown.
 
 ## Charging sources
 
@@ -35,7 +71,7 @@ Four switches control what Charge Wise does. All start off on a new entry.
   converts that budget to current using the configured single-phase voltage and never requests more than the
   configured limits.
 - **Off-peak charging** charges from the grid at the **Off-peak current** while an off-peak window is active. It
-  ignores the solar budget and battery protection, but still respects the EV-connected sensor, the current maximum
+  ignores the solar budget and battery protection, but still respects the connection reading, the current maximum
   and the failure stop.
 - **Manual override** requests only the **Manual current** and ignores the Solar and off-peak sources.
 
@@ -114,8 +150,8 @@ protection binary sensor is created only when a battery-power entity is configur
 
 - For the Solar source, invalid or unavailable grid or charger power stops charging. A configured battery sensor that becomes
   invalid also stops Solar operation.
-- If an EV-connected sensor is configured, an unavailable or disconnected state holds charging for every source.
-- If optional battery or EV-connected sensors are not configured, the integration cannot provide those protections.
+- If a connection or charger-status sensor is configured, an unknown or disconnected connection holds charging for every source.
+- If optional battery or charger status/connection sensors are not configured, the integration cannot provide those protections.
 - There is no generic stale-reading timeout or handling of source-specific timestamp attributes. Charge Wise relies
   on each source integration to mark stale readings unavailable.
 - Sensor recovery does not change the switches. Solar only resumes after its safety checks and cooldown.
@@ -130,6 +166,7 @@ Each entry creates:
   they keep their last value across restarts.
 - **Controller status** sensor with the stable states Off, Waiting, Charging, Paused, and Error.
 - **Available solar budget**, **Requested current**, and **Decision reason** sensors.
+- **Vehicle connected** and **Vehicle charging** binary sensors, and a **Charger session** sensor. These show observations even when control is off; missing evidence appears as unknown.
 - **Next off-peak window** timestamp sensor.
 - **Off-peak active** and **EV-first active** binary sensors.
 - **Battery protection active** binary sensor when battery power is configured.
@@ -147,7 +184,7 @@ and add it again with the charger entities.
 ### Solar remains paused
 
 Check that the grid-power sign is import-positive/export-negative, the selected power entities report mW, W, or kW,
-and any configured battery or EV-connected sensor is available and valid. The **Decision reason** sensor reports the
+and any configured battery or charger status/connection sensor is available and valid. The **Decision reason** sensor reports the
 specific condition.
 
 ### A charger command fails

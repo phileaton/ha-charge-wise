@@ -8,6 +8,7 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_DISCHARGE_SIGN,
     CONF_BATTERY_LEVEL_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
+    CONF_CHARGER_CURRENT_ENTITY,
     CONF_CHARGER_POWER_ENTITY,
     CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
     CONF_FORECAST_REMAINING_ENTITY,
@@ -17,8 +18,10 @@ from custom_components.charge_wise.const import (
     CONF_OFFPEAK_WINDOWS,
     CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
+    CONF_VOLTAGE_V,
     DEFAULT_BATTERY_DISCHARGE_SIGN,
     DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
+    DEFAULT_VOLTAGE_V,
 )
 
 type Card = dict[str, Any]
@@ -139,6 +142,7 @@ def _battery_and_ev_section(
     ids: Mapping[str, str],
     options: Mapping[str, Any],
     budget_in_kw: bool,
+    charger_power_scale_to_kw: float | None,
 ) -> list[Card]:
     """Return charging status, its reason and compact battery and EV readings."""
     cards = [_heading("Charging status", "mdi:ev-station")]
@@ -167,19 +171,45 @@ def _battery_and_ev_section(
                 "grid_options": {"columns": 6, "rows": 3},
             },
         )
-    if "requested_current" in ids:
+    maximum_current = float(options.get(CONF_MAXIMUM_CURRENT_A, 32))
+    current = options.get(CONF_CHARGER_CURRENT_ENTITY)
+    power = options.get(CONF_CHARGER_POWER_ENTITY)
+    if current or (power and charger_power_scale_to_kw is not None):
+        maximum = maximum_current
+        if not current and charger_power_scale_to_kw is not None:
+            maximum = (
+                maximum_current
+                * float(options.get(CONF_VOLTAGE_V, DEFAULT_VOLTAGE_V))
+                / (1000 * charger_power_scale_to_kw)
+            )
         cards.append(
             {
                 "type": "gauge",
-                "entity": ids["requested_current"],
-                "name": "Requested current",
+                "entity": current or power,
+                "name": "Actual current" if current else "Actual charging power",
                 "min": 0,
-                "max": float(options.get(CONF_MAXIMUM_CURRENT_A, 32)),
+                "max": maximum,
                 "needle": True,
-                "segments": _gauge_segments((0, "#9e9e9e"), (6, "#8e63c7")),
+                "segments": _gauge_segments((0, "#9e9e9e")),
                 "grid_options": {"columns": 6, "rows": 3},
             }
         )
+    elif power:
+        cards.append(_power_value(power, "Actual charging power"))
+    if requested := ids.get("requested_current"):
+        connected = ids.get("vehicle_connected", "")
+        charging = ids.get("vehicle_charging", "")
+        content = (
+            f"{{% if is_number(states('{requested}')) %}}"
+            f"Requested limit: **{{{{ states('{requested}') | float | round(1) }}}} A**"
+            "{% else %}Requested limit unavailable{% endif %}"
+            f"\n\n{{% if is_state('{charging}', 'on') %}}Vehicle drawing power"
+            f"{{% elif is_state('{connected}', 'off') %}}Vehicle disconnected"
+            f"{{% elif is_state('{connected}', 'on') and is_state('{charging}', 'off') %}}"
+            "Connected, not drawing power"
+            "{% else %}Vehicle activity unknown{% endif %}"
+        )
+        cards.append({"type": "markdown", "content": content, "grid_options": {"columns": 12}})
     if "available_solar_budget" in ids:
         entity = ids["available_solar_budget"]
         default_unit = "kW" if budget_in_kw else "W"
@@ -404,13 +434,14 @@ def build_view(
     *,
     budget_in_kw: bool = True,
     solar_power_scale_to_kw: float | None = None,
+    charger_power_scale_to_kw: float | None = None,
 ) -> Card:
     """Build the dashboard view from the entity IDs this entry registered and its configured source entities.
 
     Power summaries use the live sensor unit, including user-selected W or kW.
     """
     sections = [
-        _battery_and_ev_section(ids, options, budget_in_kw),
+        _battery_and_ev_section(ids, options, budget_in_kw, charger_power_scale_to_kw),
         _live_section(ids, options),
         _controls_section(ids, control_keys) + _budget_section(ids, options),
         _solar_section(ids, options, solar_power_scale_to_kw),

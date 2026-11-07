@@ -10,10 +10,18 @@
           "charger_switch_entity": "Charger on/off switch",
           "current_target_entity": "Active current target",
           "hardware_maximum_entity": "Hardware maximum current",
-          "ev_connected_entity": "EV connected sensor",
           "minimum_current_a": "Minimum operating current",
           "maximum_current_a": "Safe maximum current",
-          "voltage_v": "Charging voltage"
+          "voltage_v": "Charging voltage",
+          "charger_status_entity": "Charger status / connection sensor",
+          "charger_status_profile": "Charger status profile",
+          "charger_states_disconnected": "Custom disconnected states",
+          "charger_states_idle": "Custom idle states",
+          "charger_states_charging": "Custom charging states",
+          "charger_states_paused": "Custom paused states",
+          "charger_states_finished": "Custom finished states",
+          "charger_states_fault": "Custom fault states",
+          "charger_current_entity": "Measured charger current"
         },
         "data_description": {
           "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
@@ -21,10 +29,18 @@
           "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
           "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
           "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
-          "ev_connected_entity": "Optional binary sensor or charger status sensor. For binary sensors: on = connected, off = disconnected. For OCPP status sensor (sensor.charger_status_connector): Available = disconnected, any other state = connected. When configured, charging is held unless it reports the EV connected.",
           "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
           "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
-          "voltage_v": "Single-phase voltage used to convert available power to current."
+          "voltage_v": "Single-phase voltage used to convert available power to current.",
+          "charger_status_entity": "Optional binary connection sensor (on means connected, off means disconnected), or charger status sensor interpreted using the selected profile. Binary sensors do not report session status.",
+          "charger_status_profile": "For status sensors: Automatic recognizes the supplying OCPP or Wallbox integration. Otherwise select a profile or Custom. Ignored for binary sensors.",
+          "charger_states_disconnected": "For the Custom profile only: enter each exact sensor value meaning disconnected. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_idle": "For the Custom profile only: enter each exact sensor value meaning idle. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_charging": "For the Custom profile only: enter each exact sensor value meaning charging. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_paused": "For the Custom profile only: enter each exact sensor value meaning paused. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_finished": "For the Custom profile only: enter each exact sensor value meaning finished. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_fault": "For the Custom profile only: enter each exact sensor value meaning fault. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_current_entity": "Optional measured current sensor in A for the dashboard. Without it, the gauge shows measured charging power. Do not select an offered current or current-limit sensor."
         }
       },
       "solar": {
@@ -142,7 +158,10 @@
       "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
       "offpeak_window_empty": "An off-peak window cannot start and end at the same time.",
       "invalid_energy_unit": "The forecast sensor must report Wh, kWh, or MWh.",
-      "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty."
+      "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty.",
+      "invalid_status_mapping": "Enter at least one custom status. Values must be unique across all groups and cannot be unknown or unavailable.",
+      "status_profile_required": "The supplying integration is not recognized. Select OCPP, Wallbox or Custom for this status sensor.",
+      "invalid_current_unit": "Select a measured current sensor reporting amperes (A)."
     },
     "abort": {
       "already_configured": "This charger is already configured."
@@ -159,10 +178,18 @@
           "charger_switch_entity": "Charger on/off switch",
           "current_target_entity": "Active current target",
           "hardware_maximum_entity": "Hardware maximum current",
-          "ev_connected_entity": "EV connected sensor",
           "minimum_current_a": "Minimum operating current",
           "maximum_current_a": "Safe maximum current",
-          "voltage_v": "Charging voltage"
+          "voltage_v": "Charging voltage",
+          "charger_status_entity": "Charger status / connection sensor",
+          "charger_status_profile": "Charger status profile",
+          "charger_states_disconnected": "Custom disconnected states",
+          "charger_states_idle": "Custom idle states",
+          "charger_states_charging": "Custom charging states",
+          "charger_states_paused": "Custom paused states",
+          "charger_states_finished": "Custom finished states",
+          "charger_states_fault": "Custom fault states",
+          "charger_current_entity": "Measured charger current"
         },
         "data_description": {
           "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
@@ -170,10 +197,18 @@
           "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
           "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
           "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
-          "ev_connected_entity": "Optional binary sensor or charger status sensor. For binary sensors: on = connected, off = disconnected. For OCPP status sensor (sensor.charger_status_connector): Available = disconnected, any other state = connected. When configured, charging is held unless it reports the EV connected.",
           "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
           "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
-          "voltage_v": "Single-phase voltage used to convert available power to current."
+          "voltage_v": "Single-phase voltage used to convert available power to current.",
+          "charger_status_entity": "Optional binary connection sensor (on means connected, off means disconnected), or charger status sensor interpreted using the selected profile. Binary sensors do not report session status.",
+          "charger_status_profile": "For status sensors: Automatic recognizes the supplying OCPP or Wallbox integration. Otherwise select a profile or Custom. Ignored for binary sensors.",
+          "charger_states_disconnected": "For the Custom profile only: enter each exact sensor value meaning disconnected. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_idle": "For the Custom profile only: enter each exact sensor value meaning idle. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_charging": "For the Custom profile only: enter each exact sensor value meaning charging. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_paused": "For the Custom profile only: enter each exact sensor value meaning paused. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_finished": "For the Custom profile only: enter each exact sensor value meaning finished. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_fault": "For the Custom profile only: enter each exact sensor value meaning fault. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_current_entity": "Optional measured current sensor in A for the dashboard. Without it, the gauge shows measured charging power. Do not select an offered current or current-limit sensor."
         }
       },
       "solar": {
@@ -291,7 +326,10 @@
       "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
       "offpeak_window_empty": "An off-peak window cannot start and end at the same time.",
       "invalid_energy_unit": "The forecast sensor must report Wh, kWh, or MWh.",
-      "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty."
+      "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty.",
+      "invalid_status_mapping": "Enter at least one custom status. Values must be unique across all groups and cannot be unknown or unavailable.",
+      "status_profile_required": "The supplying integration is not recognized. Select OCPP, Wallbox or Custom for this status sensor.",
+      "invalid_current_unit": "Select a measured current sensor reporting amperes (A)."
     }
   },
   "exceptions": {
@@ -380,6 +418,31 @@
             "name": "Produced vs forecast"
           }
         }
+      },
+      "charger_session": {
+        "name": "Charger session",
+        "state": {
+          "disconnected": "Disconnected",
+          "idle": "Idle",
+          "charging": "Charging",
+          "paused": "Paused",
+          "finished": "Finished",
+          "fault": "Fault"
+        },
+        "state_attributes": {
+          "profile": {
+            "name": "Status profile"
+          },
+          "raw_status": {
+            "name": "Reported status"
+          },
+          "connection_source": {
+            "name": "Connection source"
+          },
+          "charging_source": {
+            "name": "Charging source"
+          }
+        }
       }
     },
     "binary_sensor": {
@@ -391,6 +454,12 @@
       },
       "ev_first_active": {
         "name": "EV-first active"
+      },
+      "vehicle_connected": {
+        "name": "Vehicle connected"
+      },
+      "vehicle_charging": {
+        "name": "Vehicle charging"
       }
     },
     "switch": {
@@ -417,6 +486,14 @@
         "all": "Every day",
         "weekdays": "Weekdays",
         "weekends": "Weekends"
+      }
+    },
+    "charger_status_profile": {
+      "options": {
+        "auto": "Automatic",
+        "ocpp": "OCPP",
+        "wallbox": "Wallbox",
+        "custom": "Custom"
       }
     }
   }

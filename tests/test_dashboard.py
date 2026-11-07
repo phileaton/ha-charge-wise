@@ -133,9 +133,9 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert sum(card["type"] == "gauge" for card in cards) == 2
     assert chart["grid_options"] == {"columns": "full", "rows": 6}
     assert chart["section_mode"] is True
-    current = next(card for card in cards if card.get("name") == "Requested current")
+    current = next(card for card in cards if card.get("name") == "Actual charging power")
     assert current["type"] == "gauge"
-    assert current["max"] == 32
+    assert current["max"] == 7680
     battery = next(card for card in cards if card.get("name") == "Home battery")
     assert current["grid_options"] == battery["grid_options"]
     assert any("state_translated" in card.get("content", "") for card in cards)
@@ -229,3 +229,44 @@ async def test_forecast_message_follows_sharing_permission(hass: HomeAssistant, 
     assert "grid-export surplus" in rendered
     assert "18.75 kWh" in rendered
     assert "25% restart margin" in rendered
+
+
+async def test_actual_current_gauge_keeps_requested_limit_separate(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """A connected car refusing to draw power shows zero actual current alongside its allowed limit."""
+    hass.states.async_set("sensor.measured_current", "0", {"unit_of_measurement": "A"})
+    await _setup(hass, config_entry, create=True, options={"charger_current_entity": "sensor.measured_current"})
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    cards = [card for section in config["views"][0]["sections"] for card in section["cards"]]
+    gauge = next(card for card in cards if card.get("name") == "Actual current")
+    assert gauge["entity"] == "sensor.measured_current"
+    assert gauge["max"] == 32
+    assert not any(card.get("name") == "Requested current" for card in cards)
+    summary = next(card for card in cards if "Requested limit:" in card.get("content", ""))
+    coordinator = config_entry.runtime_data.coordinator
+    await coordinator.async_set_manual_current(32)
+    await hass.async_block_till_done()
+    rendered = Template(summary["content"], hass).async_render()
+    assert "Connected, not drawing power" in rendered
+    assert "Requested limit:" in rendered
+    assert hass.states.get(gauge["entity"]).state == "0"
+    hass.states.async_set("sensor.measured_current", "unavailable")
+    hass.states.async_set("sensor.charger_power", "unavailable", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert "Vehicle activity unknown" in Template(summary["content"], hass).async_render()
+
+
+async def test_power_gauge_uses_native_kw_scale(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Without measured amps the dashboard shows watts, scaled to the sensor's actual unit."""
+    hass.states.async_set("sensor.charger_power", "0", {"unit_of_measurement": "kW"})
+    await _setup(hass, config_entry, create=True)
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    cards = [card for section in config["views"][0]["sections"] for card in section["cards"]]
+    gauge = next(card for card in cards if card.get("name") == "Actual charging power")
+    assert gauge["entity"] == "sensor.charger_power"
+    assert gauge["max"] == 7.68

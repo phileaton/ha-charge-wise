@@ -8,6 +8,8 @@ import probatio
 from custom_components.charge_wise.config_flow_handler.schemas import PAGE_SCHEMAS, PAGES
 from custom_components.charge_wise.config_flow_handler.schemas.windows import form_to_options, windows_to_form
 from custom_components.charge_wise.config_flow_handler.validators.configuration import PAGE_VALIDATORS
+from custom_components.charge_wise.const import CONF_CHARGER_STATUS_ENTITY, CONF_CHARGER_STATUS_PROFILE
+from custom_components.charge_wise.utils.charger_status import charger_status_source
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 
@@ -26,7 +28,12 @@ class PagedForm:
     ) -> None:
         """Start with the stored options, which fill defaults and suggested values, or with nothing."""
         self._hass = hass
-        self._stored: Mapping[str, Any] = stored or {}
+        defaults = dict(stored or {})
+        source = charger_status_source(defaults)
+        if source and not defaults.get(CONF_CHARGER_STATUS_ENTITY):
+            defaults[CONF_CHARGER_STATUS_ENTITY] = source
+            defaults[CONF_CHARGER_STATUS_PROFILE] = "auto" if source.startswith("binary_sensor.") else "ocpp"
+        self._stored: Mapping[str, Any] = defaults
         self._entry_id = entry_id
         self.values: dict[str, Any] = {}
 

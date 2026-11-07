@@ -18,13 +18,15 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_RECOVERY_CONFIRMATION_S,
     CONF_BATTERY_RECOVERY_W,
     CONF_BATTERY_TARGET_PERCENT,
+    CONF_CHARGER_CURRENT_ENTITY,
     CONF_CHARGER_POWER_ENTITY,
+    CONF_CHARGER_STATUS_ENTITY,
+    CONF_CHARGER_STATUS_PROFILE,
     CONF_CHARGER_SWITCH_ENTITY,
     CONF_COOLDOWN_S,
     CONF_CREATE_DASHBOARD,
     CONF_CURRENT_DEADBAND_A,
     CONF_CURRENT_TARGET_ENTITY,
-    CONF_EV_CONNECTED_ENTITY,
     CONF_EV_FIRST_RELEASE_MARGIN_PERCENT,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TODAY_ENTITY,
@@ -57,13 +59,14 @@ from custom_components.charge_wise.const import (
     DEFAULT_SOLAR_START_W,
     DEFAULT_VOLTAGE_V,
 )
+from custom_components.charge_wise.utils.charger_status import CUSTOM_STATUS_KEYS, PROFILES
 from homeassistant.helpers import selector
 
 _SENSOR_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
 _SWITCH_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="switch"))
 _NUMBER_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="number"))
 _BINARY_SENSOR_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="binary_sensor"))
-_EV_CONNECTED_SELECTOR = selector.EntitySelector(
+_CHARGER_STATUS_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"], multiple=False)
 )
 
@@ -77,9 +80,28 @@ def charger_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
         probatio.Required(CONF_CHARGER_POWER_ENTITY): _SENSOR_SELECTOR,
         probatio.Required(CONF_CHARGER_SWITCH_ENTITY): _SWITCH_SELECTOR,
         probatio.Required(CONF_CURRENT_TARGET_ENTITY): _NUMBER_SELECTOR,
+        probatio.Optional(CONF_CHARGER_CURRENT_ENTITY): _SENSOR_SELECTOR,
         probatio.Optional(CONF_HARDWARE_MAXIMUM_ENTITY): _NUMBER_SELECTOR,
-        probatio.Optional(CONF_EV_CONNECTED_ENTITY): _EV_CONNECTED_SELECTOR,
+        probatio.Optional(CONF_CHARGER_STATUS_ENTITY): _CHARGER_STATUS_SELECTOR,
     }
+    schema[
+        probatio.Optional(CONF_CHARGER_STATUS_PROFILE, default=defaults.get(CONF_CHARGER_STATUS_PROFILE, "auto"))
+    ] = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=list(PROFILES),
+            translation_key="charger_status_profile",
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+    for key in CUSTOM_STATUS_KEYS:
+        schema[probatio.Optional(key)] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[],
+                multiple=True,
+                custom_value=True,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        )
     _add_number_field(schema, defaults, CONF_MINIMUM_CURRENT_A, DEFAULT_MINIMUM_CURRENT_A, 1, 32, 1, "A")
     _add_number_field(schema, defaults, CONF_MAXIMUM_CURRENT_A, None, 1, 80, 1, "A")
     _add_number_field(schema, defaults, CONF_VOLTAGE_V, DEFAULT_VOLTAGE_V, 100, 300, 1, "V")

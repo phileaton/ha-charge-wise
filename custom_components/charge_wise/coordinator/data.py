@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from custom_components.charge_wise.utils.charger_status import ChargerSessionStatus
 from custom_components.charge_wise.utils.charging_controller import ChargeWiseReason, ControllerStatus
 
 if TYPE_CHECKING:
@@ -34,6 +35,13 @@ class ChargeWiseSnapshot:
     manual_current_a: float
     offpeak_current_a: float
     battery_protection_active: bool | None
+    vehicle_connected: bool | None = None
+    vehicle_charging: bool | None = None
+    charger_session: ChargerSessionStatus | None = None
+    charger_status_profile: str = "unknown"
+    charger_raw_status: str | None = None
+    charger_connection_source: str | None = None
+    charger_charging_source: str | None = None
     average_house_load_w: float | None = None
     house_load_w: float | None = None
     battery_need_kwh: float | None = None

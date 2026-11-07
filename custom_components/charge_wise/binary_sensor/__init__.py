@@ -14,6 +14,14 @@ from custom_components.charge_wise.binary_sensor.offpeak_active import (
     ENTITY_DESCRIPTION as OFFPEAK_DESCRIPTION,
     ChargeWiseOffpeakActiveBinarySensor,
 )
+from custom_components.charge_wise.binary_sensor.vehicle_charging import (
+    ENTITY_DESCRIPTION as CHARGING_DESCRIPTION,
+    ChargeWiseVehicleChargingBinarySensor,
+)
+from custom_components.charge_wise.binary_sensor.vehicle_connected import (
+    ENTITY_DESCRIPTION as CONNECTED_DESCRIPTION,
+    ChargeWiseVehicleConnectedBinarySensor,
+)
 from custom_components.charge_wise.const import DOMAIN
 from homeassistant.helpers import entity_registry as er
 
@@ -34,6 +42,8 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.coordinator
     async_add_entities(
         [
+            ChargeWiseVehicleConnectedBinarySensor(coordinator, CONNECTED_DESCRIPTION),
+            ChargeWiseVehicleChargingBinarySensor(coordinator, CHARGING_DESCRIPTION),
             ChargeWiseOffpeakActiveBinarySensor(coordinator, OFFPEAK_DESCRIPTION),
             ChargeWiseEvFirstActiveBinarySensor(coordinator, EV_FIRST_DESCRIPTION),
         ],

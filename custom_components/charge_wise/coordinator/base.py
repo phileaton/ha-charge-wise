@@ -1,6 +1,7 @@
 """Event-driven coordinator for Charge Wise."""
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timedelta
 from functools import partial
 from math import isclose, isfinite
@@ -20,6 +21,8 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_RECOVERY_W,
     CONF_BATTERY_TARGET_PERCENT,
     CONF_CHARGER_POWER_ENTITY,
+    CONF_CHARGER_STATUS_ENTITY,
+    CONF_CHARGER_STATUS_PROFILE,
     CONF_CHARGER_SWITCH_ENTITY,
     CONF_COOLDOWN_S,
     CONF_CURRENT_DEADBAND_A,
@@ -62,6 +65,12 @@ from custom_components.charge_wise.const import (
     POWER_TO_W,
 )
 from custom_components.charge_wise.coordinator.data import ChargeWiseSnapshot
+from custom_components.charge_wise.utils.charger_status import (
+    ChargerObservation,
+    ChargingPowerDetector,
+    charger_status_source,
+    classify_status,
+)
 from custom_components.charge_wise.utils.charging_controller import (
     ChargeWiseController,
     ChargeWiseReason,
@@ -87,6 +96,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.recorder import get_instance
 from homeassistant.helpers.storage import Store
@@ -131,7 +141,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self.forecast_accuracy = ForecastAccuracy()
         self._last_switch_command: tuple[bool, datetime] | None = None
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
-        self.ev_connected_configured = bool(self.options.get(CONF_EV_CONNECTED_ENTITY))
+        self.ev_connected_configured = bool(charger_status_source(self.options))
+        self.charger_observation = ChargerObservation()
+        self._charging_power_detector = ChargingPowerDetector()
         self.house_load = HouseLoadProfile(
             float(self.options.get(CONF_HOUSE_LOAD_WINDOW_DAYS, DEFAULT_HOUSE_LOAD_WINDOW_DAYS)),
         )
@@ -200,6 +212,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             for key in (
                 CONF_GRID_POWER_ENTITY,
                 CONF_CHARGER_POWER_ENTITY,
+                CONF_CHARGER_STATUS_ENTITY,
                 CONF_CHARGER_SWITCH_ENTITY,
                 CONF_CURRENT_TARGET_ENTITY,
                 CONF_HARDWARE_MAXIMUM_ENTITY,
@@ -421,6 +434,14 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             house_load_w=self._house_power_w(),
             battery_need_kwh=ev_first_result.battery_need_kwh if ev_first_result else None,
             forecast_surplus_kwh=ev_first_result.forecast_surplus_kwh if ev_first_result else None,
+            vehicle_connected=self.charger_observation.connected,
+            vehicle_charging=self.charger_observation.charging,
+            charger_session=self.charger_observation.session,
+            charger_status_profile=self.charger_observation.profile,
+            charger_raw_status=self.charger_observation.raw_status,
+            charger_connection_source=charger_status_source(self.options),
+            charger_charging_source=self.options.get(CONF_CHARGER_POWER_ENTITY)
+            or self.options.get(CONF_CHARGER_STATUS_ENTITY),
             forecast_accuracy_percent=self._accuracy_percent(),
             forecast_accuracy_actual_kwh=self.forecast_accuracy.actual_kwh,
             forecast_accuracy_forecast_kwh=self.forecast_accuracy.tracked_forecast_kwh,
@@ -480,17 +501,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Read and normalize the currently configured Home Assistant entities."""
         battery_power = self._battery_discharge_w()
 
-        ev_connected: bool | None = None
-        ev_entity = self.options.get(CONF_EV_CONNECTED_ENTITY)
-        if ev_entity:
-            state = self.hass.states.get(ev_entity)
-            if state is not None:
-                if state.state == STATE_ON:
-                    ev_connected = True
-                elif state.state == STATE_OFF:
-                    ev_connected = False
-                elif state.state not in ("unavailable", "unknown"):
-                    ev_connected = state.state != "Available"
+        self.charger_observation = self._read_charger_observation()
+        ev_connected = self.charger_observation.connected
 
         ev_first_boost_w = max(0.0, -battery_power) if ev_first_active and battery_power is not None else 0.0
 
@@ -540,6 +552,28 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 self.options.get(CONF_EV_FIRST_RELEASE_MARGIN_PERCENT, DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT),
             ),
         )
+
+    def _read_charger_observation(self) -> ChargerObservation:
+        """Combine explicit connection evidence with independently measured activity."""
+        source = charger_status_source(self.options)
+        state = self.hass.states.get(source) if source else None
+        profile = self.options.get(CONF_CHARGER_STATUS_PROFILE, "auto")
+        if not self.options.get(CONF_CHARGER_STATUS_ENTITY):
+            profile = "ocpp"
+        if source and source.startswith("binary_sensor."):
+            raw = state.state if state is not None else None
+            connected = True if raw == STATE_ON else False if raw == STATE_OFF else None
+            observation = ChargerObservation(connected=connected, profile="binary", raw_status=raw)
+        else:
+            if profile == "auto":
+                registered = er.async_get(self.hass).async_get(source) if source else None
+                profile = registered.platform if registered is not None else "unknown"
+            observation = classify_status(state.state if state is not None else None, profile, self.options)
+        if power_entity := self.options.get(CONF_CHARGER_POWER_ENTITY):
+            observation = replace(
+                observation, charging=self._charging_power_detector.update(self._power_w(power_entity))
+            )
+        return observation
 
     def _ev_first_result(self, now: datetime) -> EvFirstResult | None:
         """Return the forecast energy balance, or None when EV-first cannot be judged."""

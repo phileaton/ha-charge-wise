@@ -11,10 +11,12 @@ from homeassistant.data_entry_flow import FlowResult
 _CHARGER_KEYS = {
     "grid_power_entity",
     "charger_power_entity",
+    "charger_current_entity",
     "charger_switch_entity",
     "current_target_entity",
     "hardware_maximum_entity",
-    "ev_connected_entity",
+    "charger_status_entity",
+    "charger_status_profile",
     "minimum_current_a",
     "maximum_current_a",
     "voltage_v",
@@ -41,6 +43,10 @@ _PAGES = ("charger", "solar", "battery", "forecast", "offpeak")
 def _pages(options: dict[str, Any], **extra: Any) -> list[dict[str, Any]]:
     """Split flat options into the input of each page."""
     options = {k: v for k, v in options.items() if k != CONF_OFFPEAK_WINDOWS}
+    legacy = options.pop("ev_connected_entity", None)
+    if legacy and not options.get("charger_status_entity"):
+        options["charger_status_entity"] = legacy
+        options["charger_status_profile"] = "auto" if legacy.startswith("binary_sensor.") else "ocpp"
     forecast = {k: v for k, v in options.items() if k not in _CHARGER_KEYS | _SOLAR_KEYS | _BATTERY_KEYS}
     return [
         {k: v for k, v in options.items() if k in _CHARGER_KEYS},
@@ -244,3 +250,93 @@ async def test_pages_offer_next_then_submit_and_go_back(hass: HomeAssistant, con
         result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=page_input)
     assert result["step_id"] == "offpeak"
     assert result["last_step"] is True
+
+
+async def test_custom_charger_status_mapping_recovers_from_overlap(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Custom state groups reject ambiguity and store corrected mappings."""
+    hass.states.async_set("sensor.charger_status", "plugged")
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    charger = {
+        **_pages(config_entry.options)[0],
+        "charger_status_entity": "sensor.charger_status",
+        "charger_status_profile": "custom",
+        "charger_states_idle": ["plugged"],
+        "charger_states_disconnected": [" PLUGGED "],
+    }
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=charger)
+    assert result["errors"] == {"base": "invalid_status_mapping"}
+    charger["charger_states_disconnected"] = ["unplugged"]
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=charger)
+    assert result["step_id"] == "solar"
+    for page in _pages(config_entry.options)[1:]:
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=page)
+    assert result["type"] == "create_entry"
+    assert result["options"]["charger_states_idle"] == ["plugged"]
+
+
+async def test_automatic_charger_profile_requires_known_supplier(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Unregistered or unsupported sensors need an explicit profile; users can recover."""
+    hass.states.async_set("sensor.charger_status", "Available")
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    charger = {
+        **_pages(config_entry.options)[0],
+        "charger_status_entity": "sensor.charger_status",
+        "charger_status_profile": "auto",
+    }
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=charger)
+    assert result["errors"] == {"base": "status_profile_required"}
+    charger["charger_status_profile"] = "ocpp"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=charger)
+    assert result["step_id"] == "solar"
+
+
+async def test_binary_source_needs_no_status_profile(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """The unified source accepts a binary sensor even with no custom state groups."""
+    pages = _pages(config_entry.options)
+    pages[0]["charger_status_profile"] = "custom"
+    result = await _walk_setup(hass, pages)
+    assert result["type"] == "create_entry"
+    assert result["options"]["charger_status_entity"] == "binary_sensor.ev_connected"
+    assert "ev_connected_entity" not in result["options"]
+
+
+async def test_options_prefill_and_save_unified_source(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Old saved binary selections appear in the unified field and save without the obsolete key."""
+    config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    schema_keys = {str(marker): marker for marker in result["data_schema"].schema}
+    assert "ev_connected_entity" not in schema_keys
+    marker = schema_keys["charger_status_entity"]
+    assert marker.description["suggested_value"] == "binary_sensor.ev_connected"
+    for page in _pages(config_entry.options):
+        result = await hass.config_entries.options.async_configure(result["flow_id"], user_input=page)
+    assert result["type"] == "create_entry"
+    assert result["data"]["charger_status_entity"] == "binary_sensor.ev_connected"
+    assert "ev_connected_entity" not in result["data"]
+
+
+async def test_measured_current_requires_amperes(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Reject a power measurement selected as measured current and recover with an ampere sensor."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    charger = {**_pages(config_entry.options)[0], "charger_current_entity": "sensor.charger_power"}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=charger)
+    assert result["errors"] == {"base": "invalid_current_unit"}
+    hass.states.async_set("sensor.measured_current", "0", {"unit_of_measurement": "A"})
+    charger["charger_current_entity"] = "sensor.measured_current"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=charger)
+    assert result["step_id"] == "solar"

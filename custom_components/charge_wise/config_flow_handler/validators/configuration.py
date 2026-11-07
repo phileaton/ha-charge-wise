@@ -10,10 +10,12 @@ from custom_components.charge_wise.const import (
     CONF_BATTERY_LEVEL_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
     CONF_BATTERY_RECOVERY_W,
+    CONF_CHARGER_CURRENT_ENTITY,
     CONF_CHARGER_POWER_ENTITY,
+    CONF_CHARGER_STATUS_ENTITY,
+    CONF_CHARGER_STATUS_PROFILE,
     CONF_CHARGER_SWITCH_ENTITY,
     CONF_CURRENT_TARGET_ENTITY,
-    CONF_EV_CONNECTED_ENTITY,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_TODAY_ENTITY,
     CONF_GRID_POWER_ENTITY,
@@ -24,8 +26,10 @@ from custom_components.charge_wise.const import (
     CONF_SOLAR_POWER_ENTITY,
     DOMAIN,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfPower
+from custom_components.charge_wise.utils.charger_status import valid_custom_mapping
+from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 _REQUIRED_ENTITY_DOMAINS = {
     CONF_GRID_POWER_ENTITY: "sensor",
@@ -35,6 +39,7 @@ _REQUIRED_ENTITY_DOMAINS = {
 }
 _CHARGER_OPTIONAL_DOMAINS = {
     CONF_HARDWARE_MAXIMUM_ENTITY: "number",
+    CONF_CHARGER_CURRENT_ENTITY: "sensor",
 }
 _BATTERY_OPTIONAL_DOMAINS = {CONF_BATTERY_POWER_ENTITY: "sensor"}
 _FORECAST_OPTIONAL_DOMAINS = {
@@ -109,13 +114,31 @@ def validate_charger(
     if errors := _validate_entities(hass, user_input, _CHARGER_OPTIONAL_DOMAINS, required=False):
         return errors
 
-    ev_entity = user_input.get(CONF_EV_CONNECTED_ENTITY)
+    ev_entity = user_input.get(CONF_CHARGER_STATUS_ENTITY)
     if ev_entity:
         entity_domain = ev_entity.split(".", maxsplit=1)[0]
         if entity_domain not in ("binary_sensor", "sensor"):
             return {"base": "invalid_entity"}
         if hass.states.get(ev_entity) is None:
             return {"base": "entity_not_found"}
+
+    if current_entity := user_input.get(CONF_CHARGER_CURRENT_ENTITY):
+        current_state = hass.states.get(current_entity)
+        if (
+            current_state is not None
+            and current_state.attributes.get("unit_of_measurement") != UnitOfElectricCurrent.AMPERE
+        ):
+            return {"base": "invalid_current_unit"}
+
+    status_entity = user_input.get(CONF_CHARGER_STATUS_ENTITY)
+    profile = user_input.get(CONF_CHARGER_STATUS_PROFILE, "auto")
+    if status_entity and status_entity.startswith("sensor."):
+        if profile == "custom" and not valid_custom_mapping(user_input):
+            return {"base": "invalid_status_mapping"}
+        if profile == "auto":
+            registered = er.async_get(hass).async_get(status_entity)
+            if registered is None or registered.platform not in ("ocpp", "wallbox"):
+                return {"base": "status_profile_required"}
 
     if errors := _validate_power_units(hass, user_input, (CONF_GRID_POWER_ENTITY, CONF_CHARGER_POWER_ENTITY)):
         return errors

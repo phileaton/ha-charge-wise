@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING
 
+from custom_components.charge_wise.sensor.charger_session import ENTITY_DESCRIPTION as SESSION_DESCRIPTION
 from custom_components.charge_wise.sensor.controller import ENTITY_DESCRIPTIONS
 from custom_components.charge_wise.sensor.entity import ChargeWiseSensor
 
@@ -20,5 +21,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up the controller sensors."""
     async_add_entities(
-        ChargeWiseSensor(entry.runtime_data.coordinator, description) for description in ENTITY_DESCRIPTIONS
+        ChargeWiseSensor(entry.runtime_data.coordinator, description)
+        for description in (*ENTITY_DESCRIPTIONS, SESSION_DESCRIPTION)
     )

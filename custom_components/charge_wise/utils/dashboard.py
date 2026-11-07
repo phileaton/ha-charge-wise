@@ -8,7 +8,7 @@ restores one that the dashboard editor dropped from its own records.
 import logging
 from typing import Any
 
-from custom_components.charge_wise.const import CONF_SOLAR_POWER_ENTITY, DOMAIN, POWER_TO_W
+from custom_components.charge_wise.const import CONF_CHARGER_POWER_ENTITY, CONF_SOLAR_POWER_ENTITY, DOMAIN, POWER_TO_W
 from custom_components.charge_wise.utils.dashboard_layout import build_view
 from homeassistant.components import frontend
 from homeassistant.components.lovelace.const import LOVELACE_DATA
@@ -47,6 +47,8 @@ _OWN_ENTITIES = (
     ("sensor", "forecast_accuracy"),
     ("sensor", "next_offpeak_window"),
     ("binary_sensor", "ev_first_active"),
+    ("binary_sensor", "vehicle_connected"),
+    ("binary_sensor", "vehicle_charging"),
 )
 
 
@@ -93,6 +95,7 @@ def build_config(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
         entry.options,
         tuple(key for _, key in _CONTROLS),
         budget_in_kw=_budget_in_kw(hass, ids.get("available_solar_budget")),
+        charger_power_scale_to_kw=_power_scale_to_kw(hass, entry.options.get(CONF_CHARGER_POWER_ENTITY)),
         solar_power_scale_to_kw=_power_scale_to_kw(hass, entry.options.get(CONF_SOLAR_POWER_ENTITY)),
     )
     return {"views": [view]}

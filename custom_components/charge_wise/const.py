@@ -7,6 +7,9 @@ LOGGER: Logger = getLogger(__package__)
 DOMAIN = "charge_wise"
 
 CONF_GRID_POWER_ENTITY = "grid_power_entity"
+CONF_CHARGER_STATUS_ENTITY = "charger_status_entity"
+CONF_CHARGER_STATUS_PROFILE = "charger_status_profile"
+CONF_CHARGER_CURRENT_ENTITY = "charger_current_entity"
 CONF_CHARGER_POWER_ENTITY = "charger_power_entity"
 CONF_CHARGER_SWITCH_ENTITY = "charger_switch_entity"
 CONF_CURRENT_TARGET_ENTITY = "current_target_entity"

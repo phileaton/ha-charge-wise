@@ -38,6 +38,9 @@
       },
       "average_house_load": {
         "default": "mdi:home-lightning-bolt"
+      },
+      "charger_session": {
+        "default": "mdi:ev-station"
       }
     },
     "binary_sensor": {
