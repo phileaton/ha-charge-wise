@@ -28,6 +28,10 @@ _SOLAR_KEYS = {
     "current_deadband_a",
     "settle_hold_s",
     "smoothing_window_s",
+    "native_solar_entity",
+    "native_solar_option",
+    "native_solar_off_option",
+    "native_solar_release_percent",
 }
 _BATTERY_KEYS = {
     "battery_power_entity",
@@ -115,6 +119,31 @@ async def test_config_flow_rejects_reused_charger_controls(
     assert result["type"] == "form"
     assert result["step_id"] == "user"
     assert result["errors"] == {"base": "already_configured"}
+
+
+async def test_native_solar_options_are_validated(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+) -> None:
+    """A native solar mode needs two distinct options from the selected dropdown."""
+    hass.states.async_set("select.charger_solar", "Off", {"options": ["Off", "Eco", "Full solar"]})
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input=_pages(config_entry.options)[0]
+    )
+    solar = {
+        **_pages(config_entry.options)[1],
+        "native_solar_entity": "select.charger_solar",
+        "native_solar_option": "Full solar",
+    }
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=solar)
+    assert result["errors"] == {"base": "native_solar_incomplete"}
+    solar["native_solar_off_option"] = "missing"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=solar)
+    assert result["errors"] == {"base": "native_solar_invalid_options"}
+    solar["native_solar_off_option"] = "Off"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=solar)
+    assert result["step_id"] == "battery"
 
 
 async def test_config_flow_rejects_invalid_battery_thresholds_on_the_battery_page(

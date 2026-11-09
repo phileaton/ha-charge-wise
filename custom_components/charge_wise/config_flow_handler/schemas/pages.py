@@ -36,6 +36,10 @@ from custom_components.charge_wise.const import (
     CONF_LOW_SOLAR_CONFIRMATION_S,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
+    CONF_NATIVE_SOLAR_ENTITY,
+    CONF_NATIVE_SOLAR_OFF_OPTION,
+    CONF_NATIVE_SOLAR_OPTION,
+    CONF_NATIVE_SOLAR_RELEASE_PERCENT,
     CONF_SETTLE_HOLD_S,
     CONF_SMOOTHING_WINDOW_S,
     CONF_SOLAR_ENERGY_ENTITY,
@@ -54,6 +58,7 @@ from custom_components.charge_wise.const import (
     DEFAULT_HOUSE_LOAD_WINDOW_DAYS,
     DEFAULT_LOW_SOLAR_CONFIRMATION_S,
     DEFAULT_MINIMUM_CURRENT_A,
+    DEFAULT_NATIVE_SOLAR_RELEASE_PERCENT,
     DEFAULT_SETTLE_HOLD_S,
     DEFAULT_SMOOTHING_WINDOW_S,
     DEFAULT_SOLAR_START_W,
@@ -126,6 +131,14 @@ def solar_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     _add_number_field(schema, defaults, CONF_CURRENT_DEADBAND_A, DEFAULT_CURRENT_DEADBAND_A, 0, 10, 0.5, "A")
     _add_number_field(schema, defaults, CONF_SETTLE_HOLD_S, DEFAULT_SETTLE_HOLD_S, 0, 300, 5, "s")
     _add_number_field(schema, defaults, CONF_SMOOTHING_WINDOW_S, DEFAULT_SMOOTHING_WINDOW_S, 0, 600, 5, "s")
+    schema[probatio.Optional(CONF_NATIVE_SOLAR_ENTITY)] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain="select")
+    )
+    schema[probatio.Optional(CONF_NATIVE_SOLAR_OPTION)] = selector.TextSelector()
+    schema[probatio.Optional(CONF_NATIVE_SOLAR_OFF_OPTION)] = selector.TextSelector()
+    _add_number_field(
+        schema, defaults, CONF_NATIVE_SOLAR_RELEASE_PERCENT, DEFAULT_NATIVE_SOLAR_RELEASE_PERCENT, 0, 99, 1, "%"
+    )
     return probatio.Schema(schema)
 
 

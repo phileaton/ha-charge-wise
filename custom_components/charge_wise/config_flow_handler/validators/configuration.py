@@ -22,6 +22,9 @@ from custom_components.charge_wise.const import (
     CONF_HARDWARE_MAXIMUM_ENTITY,
     CONF_MAXIMUM_CURRENT_A,
     CONF_MINIMUM_CURRENT_A,
+    CONF_NATIVE_SOLAR_ENTITY,
+    CONF_NATIVE_SOLAR_OFF_OPTION,
+    CONF_NATIVE_SOLAR_OPTION,
     CONF_SOLAR_ENERGY_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     DOMAIN,
@@ -222,11 +225,35 @@ def validate_offpeak(
 
 
 def validate_solar(
-    _hass: HomeAssistant,
-    _user_input: Mapping[str, Any],
+    hass: HomeAssistant,
+    user_input: Mapping[str, Any],
+    *,
+    current_entry_id: str | None = None,
     **_: Any,
 ) -> dict[str, str]:
-    """Accept the Solar timing page; every field is already range-checked by its selector."""
+    """Validate the optional charger-managed solar control and its option values."""
+    keys = (CONF_NATIVE_SOLAR_ENTITY, CONF_NATIVE_SOLAR_OPTION, CONF_NATIVE_SOLAR_OFF_OPTION)
+    if not any(user_input.get(key) for key in keys):
+        return {}
+    if not all(user_input.get(key) for key in keys):
+        return {"base": "native_solar_incomplete"}
+    if errors := _validate_entities(hass, user_input, {CONF_NATIVE_SOLAR_ENTITY: "select"}, required=True):
+        return errors
+    registered = er.async_get(hass).async_get(user_input[CONF_NATIVE_SOLAR_ENTITY])
+    if registered is not None and registered.platform == DOMAIN:
+        return {"base": "invalid_entity"}
+    state = hass.states.get(user_input[CONF_NATIVE_SOLAR_ENTITY])
+    options = state.attributes.get("options", []) if state is not None else []
+    solar_option = user_input[CONF_NATIVE_SOLAR_OPTION]
+    off_option = user_input[CONF_NATIVE_SOLAR_OFF_OPTION]
+    if solar_option == off_option or solar_option not in options or off_option not in options:
+        return {"base": "native_solar_invalid_options"}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if (
+            entry.entry_id != current_entry_id
+            and entry.options.get(CONF_NATIVE_SOLAR_ENTITY) == user_input[CONF_NATIVE_SOLAR_ENTITY]
+        ):
+            return {"base": "already_configured"}
     return {}
 
 

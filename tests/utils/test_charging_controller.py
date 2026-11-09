@@ -65,6 +65,52 @@ def test_master_off_never_requests_charging() -> None:
     assert decision.requested_current_a == 0
 
 
+def test_native_solar_stops_for_confirmed_battery_discharge() -> None:
+    """The charger owns solar current, but confirmed battery discharge stops it."""
+    controller = ChargeWiseController(ControllerConfig(battery_confirmation_s=90))
+    settings = ControlSettings(enabled=True, solar_enabled=True, native_solar=True)
+    readings = _readings(charger_enabled=True, charger_power_w=2400, battery_discharge_w=600)
+    first = controller.evaluate(settings, readings, START)
+    stopped = controller.evaluate(settings, readings, START + timedelta(seconds=90))
+    assert first.reason is ChargeWiseReason.NATIVE_SOLAR
+    assert first.charger_enabled
+    assert stopped.reason is ChargeWiseReason.BATTERY_PROTECTION
+    assert not stopped.charger_enabled
+
+
+@pytest.mark.parametrize(
+    ("readings", "reason"),
+    [
+        (_readings(grid_power_w=None), ChargeWiseReason.GRID_UNAVAILABLE),
+        (_readings(charger_power_w=None), ChargeWiseReason.CHARGER_POWER_UNAVAILABLE),
+        (_readings(battery_discharge_w=None), ChargeWiseReason.BATTERY_UNAVAILABLE),
+        (_readings(ev_first_blocked=True), ChargeWiseReason.EV_FIRST_WAITING),
+    ],
+)
+def test_native_solar_retains_input_safeguards(readings: ControllerInput, reason: ChargeWiseReason) -> None:
+    """Native solar does not bypass missing source or forecast safeguards."""
+    decision = ChargeWiseController(ControllerConfig()).evaluate(
+        ControlSettings(enabled=True, solar_enabled=True, native_solar=True), readings, START
+    )
+    assert decision.reason is reason
+    assert not decision.charger_enabled
+
+
+def test_offpeak_takes_priority_over_native_solar() -> None:
+    """An active off-peak window takes control rather than comparing solar current."""
+    settings = ControlSettings(
+        enabled=True,
+        solar_enabled=True,
+        native_solar=True,
+        offpeak_enabled=True,
+        offpeak_active=True,
+        offpeak_current_a=10,
+    )
+    decision = ChargeWiseController(ControllerConfig()).evaluate(settings, _readings(), START)
+    assert decision.reason is ChargeWiseReason.OFFPEAK_WINDOW
+    assert decision.requested_current_a == 10
+
+
 def test_solar_mode_starts_only_after_the_start_threshold() -> None:
     """Solar mode waits below its start threshold and floors current to available power."""
     controller = ChargeWiseController(ControllerConfig(solar_start_confirmation_s=0))

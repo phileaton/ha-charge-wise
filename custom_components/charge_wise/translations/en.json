@@ -53,6 +53,10 @@
           "current_deadband_a": "Current adjustment deadband",
           "settle_hold_s": "Settle time after a current change",
           "smoothing_window_s": "Solar smoothing window",
+          "native_solar_entity": "Charger solar-mode dropdown",
+          "native_solar_option": "Full-solar option",
+          "native_solar_off_option": "Native solar off option",
+          "native_solar_release_percent": "Full-battery handoff release level",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
@@ -62,6 +66,10 @@
           "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
           "settle_hold_s": "After changing the current, wait this long before changing it again so the charger and its power reading catch up. 0 turns it off.",
           "smoothing_window_s": "Average the available solar power over this window so brief house loads do not move the charger. 0 turns it off.",
+          "native_solar_entity": "Optional. Choose the charger's solar-mode dropdown to let it manage solar charging.",
+          "native_solar_option": "The exact dropdown option for full-solar charging.",
+          "native_solar_off_option": "The exact dropdown option that disables the charger's solar mode.",
+          "native_solar_release_percent": "End the full-battery handoff below this battery level unless battery-first mode still applies.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
@@ -147,13 +155,16 @@
       }
     },
     "error": {
-      "already_configured": "This charger switch or current target is already used by another Charge Wise entry.",
+      "already_configured": "This charger control is already used by another Charge Wise entry.",
       "entity_not_found": "One or more selected entities do not currently exist.",
       "entity_required": "Choose all required entities.",
       "invalid_battery_thresholds": "The battery recovery threshold must be lower than the discharge threshold.",
       "invalid_entity": "Choose an entity from the required domain and use a different number for the current target and hardware maximum.",
       "invalid_hardware_limit": "The hardware maximum must be a valid current limit at or above the minimum operating current.",
       "invalid_limits": "The maximum current must be at least the minimum operating current.",
+      "native_solar_incomplete": "Choose the charger solar-mode dropdown and both option values, or leave all three empty.",
+      "native_solar_invalid_options": "The full-solar and off values must be different options provided by the selected dropdown.",
+      "native_solar_release_required": "Turn off Charging enabled and wait for the charger and its solar mode to turn off before changing the charger control.",
       "invalid_power_unit": "Power sensors must report mW, W, or kW.",
       "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
       "offpeak_window_empty": "An off-peak window cannot start and end at the same time.",
@@ -221,6 +232,10 @@
           "current_deadband_a": "Current adjustment deadband",
           "settle_hold_s": "Settle time after a current change",
           "smoothing_window_s": "Solar smoothing window",
+          "native_solar_entity": "Charger solar-mode dropdown",
+          "native_solar_option": "Full-solar option",
+          "native_solar_off_option": "Native solar off option",
+          "native_solar_release_percent": "Full-battery handoff release level",
           "go_back": "Go back to the previous page"
         },
         "data_description": {
@@ -230,6 +245,10 @@
           "current_deadband_a": "Ignore smaller current changes to avoid unnecessary charger commands.",
           "settle_hold_s": "After changing the current, wait this long before changing it again so the charger and its power reading catch up. 0 turns it off.",
           "smoothing_window_s": "Average the available solar power over this window so brief house loads do not move the charger. 0 turns it off.",
+          "native_solar_entity": "Optional. Choose the charger's solar-mode dropdown to let it manage solar charging.",
+          "native_solar_option": "The exact dropdown option for full-solar charging.",
+          "native_solar_off_option": "The exact dropdown option that disables the charger's solar mode.",
+          "native_solar_release_percent": "End the full-battery handoff below this battery level unless battery-first mode still applies.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
       },
@@ -315,13 +334,16 @@
       }
     },
     "error": {
-      "already_configured": "This charger switch or current target is already used by another Charge Wise entry.",
+      "already_configured": "This charger control is already used by another Charge Wise entry.",
       "entity_not_found": "One or more selected entities do not currently exist.",
       "entity_required": "Choose all required entities.",
       "invalid_battery_thresholds": "The battery recovery threshold must be lower than the discharge threshold.",
       "invalid_entity": "Choose an entity from the required domain and use a different number for the current target and hardware maximum.",
       "invalid_hardware_limit": "The hardware maximum must be a valid current limit at or above the minimum operating current.",
       "invalid_limits": "The maximum current must be at least the minimum operating current.",
+      "native_solar_incomplete": "Choose the charger solar-mode dropdown and both option values, or leave all three empty.",
+      "native_solar_invalid_options": "The full-solar and off values must be different options provided by the selected dropdown.",
+      "native_solar_release_required": "Turn off Charging enabled and wait for the charger and its solar mode to turn off before changing the charger control.",
       "invalid_power_unit": "Power sensors must report mW, W, or kW.",
       "offpeak_window_incomplete": "Set both the start and the end of an off-peak window, or clear both.",
       "offpeak_window_empty": "An off-peak window cannot start and end at the same time.",
@@ -333,6 +355,9 @@
     }
   },
   "exceptions": {
+    "charger_unloading": {
+      "message": "Wait for Charge Wise to finish releasing charger control before enabling charging."
+    },
     "invalid_manual_current": {
       "message": "Current must be between {minimum} A and {maximum} A."
     },
@@ -403,6 +428,7 @@
           "low_solar_confirming": "Confirming low solar power",
           "low_solar": "Charging stopped because solar power remained low",
           "solar_charging": "Charging from available solar power",
+          "native_solar": "Charger-managed solar active or awaiting confirmation",
           "hardware_limit": "The hardware limit is below the minimum operating current",
           "control_failed": "A charger command failed",
           "ev_first": "Charging from solar, sharing the battery's charging power"

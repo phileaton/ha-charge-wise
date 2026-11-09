@@ -81,7 +81,12 @@ async def async_unload_entry(
     entry: ChargeWiseConfigEntry,
 ) -> bool:
     """Unload the integration platforms."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not await entry.runtime_data.coordinator.async_prepare_unload():
+        return False
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        entry.runtime_data.coordinator.async_cancel_unload()
+        return False
+    return True
 
 
 async def async_reload_entry(

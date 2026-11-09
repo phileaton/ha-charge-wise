@@ -38,6 +38,7 @@ class ChargeWiseReason(StrEnum):
     LOW_SOLAR_CONFIRMING = "low_solar_confirming"
     LOW_SOLAR = "low_solar"
     SOLAR_CHARGING = "solar_charging"
+    NATIVE_SOLAR = "native_solar"
     EV_FIRST = "ev_first"
     HARDWARE_LIMIT = "hardware_limit"
     CONTROL_FAILED = "control_failed"
@@ -75,6 +76,7 @@ class ControlSettings:
     offpeak_current_a: float = 6
     offpeak_active: bool = False
     offpeak_next_change: datetime | None = None
+    native_solar: bool = False
 
 
 @dataclass(frozen=True)
@@ -183,6 +185,13 @@ class ChargeWiseController:
             self._reset_solar()
             return self._fixed_current_decision(settings.manual_current_a, ChargeWiseReason.MANUAL, readings)
 
+        if settings.native_solar and settings.offpeak_enabled and settings.offpeak_active:
+            self._reset_solar()
+            return replace(
+                self._fixed_current_decision(settings.offpeak_current_a, ChargeWiseReason.OFFPEAK_WINDOW, readings),
+                next_update_at=settings.offpeak_next_change,
+            )
+
         solar = self._evaluate_solar_source(settings, readings, now)
         offpeak = self._evaluate_offpeak(settings, readings)
 
@@ -221,7 +230,7 @@ class ChargeWiseController:
             return None
         if not self._solar_running:
             self._solar_running = True
-        decision = self._evaluate_solar(readings, now)
+        decision = self._evaluate_solar(readings, now, native_solar=settings.native_solar)
         if readings.ev_first_boost_w > 0 and decision.reason is ChargeWiseReason.SOLAR_CHARGING:
             return replace(decision, reason=ChargeWiseReason.EV_FIRST)
         return decision
@@ -256,7 +265,9 @@ class ChargeWiseController:
         target = min(max(current_a, self.config.minimum_current_a), maximum)
         return self._decision(ControllerStatus.CHARGING, reason, readings, target, True)
 
-    def _evaluate_solar(self, readings: ControllerInput, now: datetime) -> ControllerDecision:
+    def _evaluate_solar(
+        self, readings: ControllerInput, now: datetime, *, native_solar: bool = False
+    ) -> ControllerDecision:
         """Calculate a Solar target after validating all configured safety inputs."""
         if readings.grid_power_w is None:
             return self._pause(ChargeWiseReason.GRID_UNAVAILABLE, readings, now)
@@ -270,6 +281,51 @@ class ChargeWiseController:
             return self._pause(ChargeWiseReason.BATTERY_UNAVAILABLE, readings, now)
         smoothed_solar_w = self._smoothed(available_solar_w, now)
         next_updates = self._update_battery_protection(readings, now)
+        if native_solar:
+            if readings.ev_first_blocked and readings.battery_reserve_w is None:
+                return self._solar_decision(
+                    ControllerStatus.WAITING,
+                    ChargeWiseReason.EV_FIRST_WAITING,
+                    readings,
+                    0,
+                    False,
+                    available_solar_w,
+                    next_updates,
+                    now,
+                )
+            if self._battery_protection_active:
+                return self._solar_decision(
+                    ControllerStatus.PAUSED,
+                    ChargeWiseReason.BATTERY_PROTECTION,
+                    readings,
+                    0,
+                    False,
+                    available_solar_w,
+                    next_updates,
+                    now,
+                )
+            if self._cooldown_until is not None and now < self._cooldown_until:
+                next_updates.append(self._cooldown_until)
+                return self._solar_decision(
+                    ControllerStatus.WAITING,
+                    ChargeWiseReason.COOLDOWN,
+                    readings,
+                    0,
+                    False,
+                    available_solar_w,
+                    next_updates,
+                    now,
+                )
+            return self._solar_decision(
+                ControllerStatus.CHARGING if readings.charger_power_w > 0 else ControllerStatus.WAITING,
+                ChargeWiseReason.NATIVE_SOLAR,
+                readings,
+                0,
+                True,
+                available_solar_w,
+                next_updates,
+                now,
+            )
         if not readings.ev_first_blocked:
             self._battery_first_ready = False
         elif readings.battery_reserve_w is not None:

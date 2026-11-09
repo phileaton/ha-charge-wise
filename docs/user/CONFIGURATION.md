@@ -17,14 +17,14 @@ forms have no Back button, so pages 2 to 5 end with a **Go back to the previous 
 | Measured charger power      | Yes      | Sensor in mW, W, or kW                                                   |
 | Charger control             | Yes      | Switch used to start or stop charging                                    |
 | Active current target       | Yes      | Writable number entity in amperes                                        |
-| Safe maximum current        | Yes      | Explicit current limit that always caps requests                         |
+| Safe maximum current        | Yes      | Current limit for Charge Wise-controlled charging                        |
 | Hardware maximum current    | No       | Read-only number entity; applies an additional, lower cap when available |
 | Battery power               | No       | Power sensor; configure whether discharge is positive or negative        |
 | Charger status / connection | No       | Binary connection sensor, or status sensor with a profile                |
 
 The safe maximum is required even if a hardware-maximum entity is selected. If that optional entity becomes
 unavailable, the configured safe maximum still applies. Multiple Charge Wise entries may share measurement sensors,
-but cannot share a charger switch or active current target.
+but cannot share a charger switch, active current target, or native solar-mode control.
 
 ## Charger status and connection
 
@@ -76,7 +76,7 @@ Switches and an off-peak mode control what Charge Wise does. All start off on a 
 - **Manual override** requests only the **Manual current** and ignores the Solar and off-peak sources.
 
 Solar and off-peak can be on together. Inside a window the higher of the two requested currents wins, and Solar wins a
-tie. Outside a window Solar runs as usual.
+tie, except during native solar handoff, when the off-peak window takes priority. Outside a window Solar runs as usual.
 
 The switch states and off-peak mode are restored after a Home Assistant restart. A restored Solar source is checked against current
 sensor values and held through the restart cooldown before it can start.
@@ -138,6 +138,31 @@ stop charging. Battery discharge is excluded from that budget.
 Export-only starts still follow the configured Solar start threshold, start confirmation, and restart cooldown. A
 sustained shortage still follows the ordinary low-solar stop protection. Missing forecast inputs or daylight information
 block forecast-managed charging. Manual override and off-peak charging are unaffected.
+
+## Charger-managed solar charging
+
+On the Solar charging page, optionally select a charger solar-mode dropdown and enter its exact full-solar and off
+options. This supports dropdown controls, not on/off switches or vendor-specific actions. Charge Wise hands solar
+control to the charger when EV-first sharing is inactive, or when the battery reaches 100%. The full-battery handoff
+continues until the battery drops below the configured release level (97% by default); battery-first can keep the
+handoff active. The full-battery hold survives a restart. Installations without a battery can also use this handoff.
+
+The charger decides its own solar start, stop and current while managing solar. Configure its own safe current limit
+and battery priority first: Charge Wise cannot enforce its configured current limits or guarantee battery priority
+during handoff. Charge Wise's Solar start threshold, low-solar timing and current smoothing do not control the
+charger during handoff. The requested current sensor reads zero because Charge Wise is not requesting a current.
+
+Charging enabled, connection checks, battery-discharge protection and required input checks still apply. Manual
+override or an active off-peak window interrupts the handoff. Charge Wise stops the charger while changing ownership,
+and disables native solar when the handoff ends. An unavailable native control or a failed mode command stops
+charging and reports a control error. The Decision reason sensor can report `native_solar` during handoff; update
+automations that assume an exhaustive list of its previous values. Mode confirmation depends on what the charger
+integration reports to Home Assistant, which may not immediately reflect the charger's physical state.
+
+Before removing or changing the native solar control, its option values, or the charger switch, turn off **Charging
+enabled** and wait for both the charger and native solar mode to report off. Charge Wise checks this before saving.
+When unloading the integration, it also waits for both controls to report off; if it cannot confirm that, unloading
+fails rather than abandoning the handoff.
 
 ## Controller options
 

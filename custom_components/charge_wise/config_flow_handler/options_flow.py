@@ -3,6 +3,12 @@
 from typing import Any
 
 from custom_components.charge_wise.config_flow_handler.paged_form import BACK_KEY, PagedForm
+from custom_components.charge_wise.const import (
+    CONF_CHARGER_SWITCH_ENTITY,
+    CONF_NATIVE_SOLAR_ENTITY,
+    CONF_NATIVE_SOLAR_OFF_OPTION,
+    CONF_NATIVE_SOLAR_OPTION,
+)
 from homeassistant import config_entries
 
 
@@ -35,8 +41,24 @@ class ChargeWiseOptionsFlow(config_entries.OptionsFlow):
                 form.accept(user_input)
                 next_page = form.next_page(page)
                 if next_page is None:
-                    return self.async_create_entry(title="", data=form.options())
-                return await self._async_page(next_page, None)
+                    options = form.options()
+                    changed = any(
+                        self.config_entry.options.get(key) != options.get(key)
+                        for key in (
+                            CONF_CHARGER_SWITCH_ENTITY,
+                            CONF_NATIVE_SOLAR_ENTITY,
+                            CONF_NATIVE_SOLAR_OPTION,
+                            CONF_NATIVE_SOLAR_OFF_OPTION,
+                        )
+                    )
+                    if changed and self.config_entry.options.get(CONF_NATIVE_SOLAR_ENTITY):
+                        runtime = getattr(self.config_entry, "runtime_data", None)
+                        if runtime is None or not runtime.coordinator.native_control_released():
+                            errors = {"base": "native_solar_release_required"}
+                    if not errors:
+                        return self.async_create_entry(title="", data=options)
+                else:
+                    return await self._async_page(next_page, None)
 
         schema = form.schema(page)
         return self.async_show_form(
