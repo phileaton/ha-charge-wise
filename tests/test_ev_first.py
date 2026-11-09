@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from freezegun.api import FrozenDateTimeFactory
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.charge_wise.const import (
     CONF_BATTERY_CAPACITY_KWH,
@@ -61,6 +61,9 @@ async def ev_first_entry(hass: HomeAssistant, config_entry: MockConfigEntry) -> 
 
 async def _turn_on(hass: HomeAssistant, entry: MockConfigEntry, *keys: str) -> None:
     for key in keys:
+        if key == "ev_first_mode":
+            await _select_ev_first(hass, entry, "on")
+            continue
         await hass.services.async_call(
             "switch",
             "turn_on",
@@ -70,12 +73,20 @@ async def _turn_on(hass: HomeAssistant, entry: MockConfigEntry, *keys: str) -> N
     await hass.async_block_till_done()
 
 
+async def _select_ev_first(hass: HomeAssistant, entry: MockConfigEntry, option: str) -> str:
+    """Select EV-first through its real Home Assistant service."""
+    entity_id = _entity_id(hass, entry, "select", "ev_first_mode")
+    await hass.services.async_call("select", "select_option", {"entity_id": entity_id, "option": option}, blocking=True)
+    await hass.async_block_till_done()
+    return entity_id
+
+
 async def test_ev_first_adds_battery_charge_power_to_the_solar_budget(
     hass: HomeAssistant,
     ev_first_entry: MockConfigEntry,
 ) -> None:
     """A covering forecast lets the EV use the power flowing into the battery."""
-    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_enabled")
+    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_mode")
 
     active = _entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active")
     budget = _entity_id(hass, ev_first_entry, "sensor", "available_solar_budget")
@@ -98,7 +109,7 @@ async def test_ev_first_forecast_shortfall_preserves_genuine_export_charging(
     watts = {"unit_of_measurement": "W"}
     hass.states.async_set("sensor.grid_power", "-7200", watts)
     await hass.async_block_till_done()
-    await _turn_on(hass, ev_first_entry, "enabled", "ev_first_enabled", "solar_enabled")
+    await _turn_on(hass, ev_first_entry, "enabled", "ev_first_mode", "solar_enabled")
 
     async def set_current(call: ServiceCall) -> None:
         hass.states.async_set(
@@ -146,18 +157,13 @@ async def test_ev_first_forecast_shortfall_preserves_genuine_export_charging(
     assert charger.state == "on"
 
 
-async def test_ev_first_switch_is_refused_without_forecast_inputs(
+async def test_ev_first_mode_is_refused_without_forecast_inputs(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
 ) -> None:
-    """The switch cannot be turned on until the forecast inputs are configured."""
+    """The mode cannot be enabled until the forecast inputs are configured."""
     with pytest.raises(ServiceValidationError):
-        await hass.services.async_call(
-            "switch",
-            "turn_on",
-            {"entity_id": _entity_id(hass, init_integration, "switch", "ev_first_enabled")},
-            blocking=True,
-        )
+        await _select_ev_first(hass, init_integration, "on")
 
 
 async def test_house_power_is_production_plus_grid_and_battery_less_charger(
@@ -205,19 +211,14 @@ async def test_ev_first_hold_state_is_restored_after_a_restart_on_the_same_day(
     ev_first_entry: MockConfigEntry,
 ) -> None:
     """A restart keeps the release-margin hold."""
-    coordinator = ev_first_entry.runtime_data.coordinator
-    coordinator._ev_first_was_active = True  # noqa: SLF001
-    saved = coordinator._ev_first_as_dict()  # noqa: SLF001
-    coordinator._reset_ev_first()  # noqa: SLF001
-
-    coordinator._restore_ev_first(saved)  # noqa: SLF001
-
-    assert coordinator._ev_first_was_active  # noqa: SLF001
-
-    coordinator._reset_ev_first()  # noqa: SLF001
-    coordinator._restore_ev_first({**saved, "date": "2000-01-01"})  # noqa: SLF001
-
-    assert not coordinator._ev_first_was_active  # noqa: SLF001
+    await _turn_on(hass, ev_first_entry, "solar_enabled", "ev_first_mode")
+    active = _entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active")
+    hass.states.async_set("sensor.forecast_remaining", "15", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+    assert hass.states.get(active).state == "on"
+    assert await hass.config_entries.async_reload(ev_first_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(active).state == "on"
 
 
 async def test_measured_accuracy_scales_the_forecast_surplus(
@@ -292,7 +293,7 @@ async def test_forecast_cutoff_reaches_the_charger_stop_command(
     async def record(call: ServiceCall) -> None:
         commands.append(call)
 
-    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_enabled")
+    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_mode")
     hass.services.async_register("number", "set_value", record)
     hass.services.async_register("switch", "turn_on", record)
     hass.services.async_register("switch", "turn_off", record)
@@ -326,7 +327,7 @@ async def test_full_battery_releases_forecast_restriction(
 ) -> None:
     """Battery level changes release and restore priority through the live state listener."""
     hass.states.async_set("sensor.forecast_remaining", "0", {"unit_of_measurement": "kWh"})
-    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_enabled")
+    await _turn_on(hass, ev_first_entry, "enabled", "solar_enabled", "ev_first_mode")
     active = _entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active")
     assert hass.states.get(active).state == "off"
 
@@ -337,3 +338,119 @@ async def test_full_battery_releases_forecast_restriction(
     hass.states.async_set("sensor.battery_level", "99", {"unit_of_measurement": "%"})
     await hass.async_block_till_done()
     assert hass.states.get(active).state == "off"
+
+
+async def _move(hass: HomeAssistant, freezer: FrozenDateTimeFactory, when: str) -> None:
+    """Deliver due timers after moving the test clock."""
+    freezer.move_to(when)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+
+async def test_ev_first_once_expires_at_sunset_despite_charging_pauses(
+    hass: HomeAssistant, ev_first_entry: MockConfigEntry, freezer: FrozenDateTimeFactory
+) -> None:
+    """One-time sharing belongs to today, independent of charging pauses or forecast changes."""
+    await _move(hass, freezer, "2026-11-05T18:00:00Z")
+    _set_sun(hass, 4)
+    mode = await _select_ev_first(hass, ev_first_entry, "on_once")
+    assert hass.states.get(mode).attributes["options"] == ["off", "on", "on_once"]
+    await _turn_on(hass, ev_first_entry, "solar_enabled")
+    active = _entity_id(hass, ev_first_entry, "binary_sensor", "ev_first_active")
+    assert hass.states.get(active).state == "on"
+    hass.states.async_set("sensor.charger_power", "0", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.forecast_remaining", "1", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+    assert hass.states.get(mode).state == "on_once"
+    assert hass.states.get(active).state == "off"
+    await _move(hass, freezer, "2026-11-05T21:59:59Z")
+    assert hass.states.get(mode).state == "on_once"
+    await _move(hass, freezer, "2026-11-05T22:00:00Z")
+    assert hass.states.get(mode).state == "off"
+    assert hass.states.get(active).state == "off"
+    await _move(hass, freezer, "2026-11-06T18:00:00Z")
+    _set_sun(hass, 4)
+    assert hass.states.get(mode).state == "off"
+
+
+@pytest.mark.parametrize(
+    ("restart_at", "expected"),
+    [("2026-11-05T19:00:00Z", "on_once"), ("2026-11-05T23:00:00Z", "off"), ("2026-11-06T18:00:00Z", "off")],
+)
+async def test_ev_first_once_restores_original_deadline(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+    restart_at: str,
+    expected: str,
+) -> None:
+    """Reloads retain the original sunset and never re-arm a request on the following day."""
+    await _move(hass, freezer, "2026-11-05T18:00:00Z")
+    _set_sun(hass, 4)
+    mode = await _select_ev_first(hass, ev_first_entry, "on_once")
+    assert await hass.config_entries.async_unload(ev_first_entry.entry_id)
+    await hass.async_block_till_done()
+    await _move(hass, freezer, restart_at)
+    _set_sun(hass, 4)
+    assert await hass.config_entries.async_setup(ev_first_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(mode).state == expected
+    if expected == "on_once":
+        await _move(hass, freezer, "2026-11-05T22:00:00Z")
+        assert hass.states.get(mode).state == "off"
+
+
+@pytest.mark.parametrize("replacement", ["off", "on"])
+async def test_ev_first_mode_change_cancels_expiry_and_survives_next_day(
+    hass: HomeAssistant, ev_first_entry: MockConfigEntry, freezer: FrozenDateTimeFactory, replacement: str
+) -> None:
+    """Explicit Off or recurring On replaces the one-time deadline and persists across days."""
+    await _move(hass, freezer, "2026-11-05T18:00:00Z")
+    _set_sun(hass, 4)
+    mode = await _select_ev_first(hass, ev_first_entry, "on_once")
+    await _select_ev_first(hass, ev_first_entry, replacement)
+    await _move(hass, freezer, "2026-11-06T18:00:00Z")
+    assert await hass.config_entries.async_reload(ev_first_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(mode).state == replacement
+
+
+@pytest.mark.parametrize(
+    ("sun_state", "setting"),
+    [
+        ("unknown", "2026-11-05T22:00:00Z"),
+        ("above_horizon", "not-a-time"),
+        ("above_horizon", "2026-11-05T22:00:00"),
+        ("below_horizon", "2026-11-06T22:00:00Z"),
+        ("below_horizon", "2026-11-05T17:00:00Z"),
+    ],
+)
+async def test_ev_first_once_requires_a_future_sunset_today(
+    hass: HomeAssistant,
+    ev_first_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+    sun_state: str,
+    setting: str,
+) -> None:
+    """Invalid or tomorrow's sunset cannot leave a today-only request armed indefinitely."""
+    await _move(hass, freezer, "2026-11-05T18:00:00Z")
+    await _select_ev_first(hass, ev_first_entry, "on")
+    hass.states.async_set("sun.sun", sun_state, {"next_setting": setting})
+    with pytest.raises(ServiceValidationError, match="On until sunset needs a sunset time for today"):
+        await _select_ev_first(hass, ev_first_entry, "on_once")
+    mode = _entity_id(hass, ev_first_entry, "select", "ev_first_mode")
+    assert hass.states.get(mode).state == "on"
+
+
+async def test_old_ev_first_switch_is_removed(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
+    """The approved replacement removes the stale switch and starts the select Off."""
+    config_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    old = registry.async_get_or_create(
+        "switch", DOMAIN, f"{config_entry.entry_id}_ev_first_enabled", config_entry=config_entry
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get(old.entity_id) is None
+    mode = _entity_id(hass, config_entry, "select", "ev_first_mode")
+    assert hass.states.get(mode).state == "off"

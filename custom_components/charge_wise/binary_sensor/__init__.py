@@ -10,6 +10,10 @@ from custom_components.charge_wise.binary_sensor.ev_first_active import (
     ENTITY_DESCRIPTION as EV_FIRST_DESCRIPTION,
     ChargeWiseEvFirstActiveBinarySensor,
 )
+from custom_components.charge_wise.binary_sensor.ev_under_drawing import (
+    ENTITY_DESCRIPTION as UNDER_DRAWING_DESCRIPTION,
+    ChargeWiseEvUnderDrawingBinarySensor,
+)
 from custom_components.charge_wise.binary_sensor.offpeak_active import (
     ENTITY_DESCRIPTION as OFFPEAK_DESCRIPTION,
     ChargeWiseOffpeakActiveBinarySensor,
@@ -22,7 +26,7 @@ from custom_components.charge_wise.binary_sensor.vehicle_connected import (
     ENTITY_DESCRIPTION as CONNECTED_DESCRIPTION,
     ChargeWiseVehicleConnectedBinarySensor,
 )
-from custom_components.charge_wise.const import DOMAIN
+from custom_components.charge_wise.const import CONF_CHARGER_CURRENT_ENTITY, DOMAIN
 from homeassistant.helpers import entity_registry as er
 
 PARALLEL_UPDATES = 0
@@ -40,6 +44,8 @@ async def async_setup_entry(
 ) -> None:
     """Create the battery-protection entity when its source is configured."""
     coordinator = entry.runtime_data.coordinator
+    if coordinator.options.get(CONF_CHARGER_CURRENT_ENTITY):
+        async_add_entities([ChargeWiseEvUnderDrawingBinarySensor(coordinator, UNDER_DRAWING_DESCRIPTION)])
     async_add_entities(
         [
             ChargeWiseVehicleConnectedBinarySensor(coordinator, CONNECTED_DESCRIPTION),

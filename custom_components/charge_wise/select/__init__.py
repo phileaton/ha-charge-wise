@@ -2,6 +2,10 @@
 
 from typing import TYPE_CHECKING
 
+from custom_components.charge_wise.select.ev_first import (
+    ENTITY_DESCRIPTIONS as EV_FIRST_DESCRIPTIONS,
+    ChargeWiseEvFirstSelect,
+)
 from custom_components.charge_wise.select.offpeak import ENTITY_DESCRIPTIONS, ChargeWiseOffpeakSelect
 
 PARALLEL_UPDATES = 1
@@ -17,7 +21,10 @@ async def async_setup_entry(
     entry: ChargeWiseConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the off-peak charging mode."""
+    """Set up the off-peak and EV-first charging modes."""
+    async_add_entities(
+        ChargeWiseEvFirstSelect(entry.runtime_data.coordinator, description) for description in EV_FIRST_DESCRIPTIONS
+    )
     async_add_entities(
         ChargeWiseOffpeakSelect(entry.runtime_data.coordinator, description) for description in ENTITY_DESCRIPTIONS
     )

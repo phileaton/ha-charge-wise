@@ -347,6 +347,12 @@
     },
     "invalid_offpeak_mode": {
       "message": "Choose Off, On, or On once."
+    },
+    "invalid_ev_first_mode": {
+      "message": "Choose Off, On, or On until sunset."
+    },
+    "ev_first_sunset_required": {
+      "message": "On until sunset needs a sunset time for today that has not passed. Check the Sun integration, or choose On for recurring EV-first charging."
     }
   },
   "entity": {
@@ -466,6 +472,9 @@
       },
       "vehicle_charging": {
         "name": "Vehicle charging"
+      },
+      "ev_under_drawing": {
+        "name": "EV drawing less than offered"
       }
     },
     "switch": {
@@ -477,12 +486,17 @@
       },
       "manual_override": {
         "name": "Manual override"
-      },
-      "ev_first_enabled": {
-        "name": "EV-first charging"
       }
     },
     "select": {
+      "ev_first_mode": {
+        "name": "EV-first charging",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "on_once": "On until sunset"
+        }
+      },
       "offpeak_mode": {
         "name": "Off-peak charging",
         "state": {

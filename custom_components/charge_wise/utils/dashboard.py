@@ -28,7 +28,7 @@ _ICON = "mdi:ev-station"
 _CONTROLS = (
     ("switch", "enabled"),
     ("switch", "solar_enabled"),
-    ("switch", "ev_first_enabled"),
+    ("select", "ev_first_mode"),
     ("select", "offpeak_mode"),
     ("switch", "manual_override"),
     ("number", "manual_current"),
@@ -47,6 +47,7 @@ _OWN_ENTITIES = (
     ("sensor", "forecast_accuracy"),
     ("sensor", "next_offpeak_window"),
     ("binary_sensor", "ev_first_active"),
+    ("binary_sensor", "ev_under_drawing"),
     ("binary_sensor", "vehicle_connected"),
     ("binary_sensor", "vehicle_charging"),
 )

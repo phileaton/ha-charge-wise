@@ -61,6 +61,8 @@ async def async_setup_entry(
         registry.async_remove(stale_offpeak)
 
     coordinator = ChargeWiseDataUpdateCoordinator(hass, entry)
+    if stale_ev_first := registry.async_get_entity_id("switch", DOMAIN, f"{entry.entry_id}_ev_first_enabled"):
+        registry.async_remove(stale_ev_first)
     entry.runtime_data = ChargeWiseData(coordinator=coordinator)
     entry.async_on_unload(coordinator.async_stop)
     await coordinator.async_start()

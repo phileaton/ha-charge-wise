@@ -222,7 +222,7 @@ async def test_forecast_message_follows_sharing_permission(hass: HomeAssistant, 
     balance = next(card for card in cards if "Forecast balance:" in card.get("content", ""))
     hass.states.async_set("sensor.test_charger_battery_energy_needed", "15")
     hass.states.async_set("sensor.test_charger_forecast_surplus_after_house_use", "20")
-    hass.states.async_set("switch.test_charger_ev_first_charging", "on")
+    hass.states.async_set("select.test_charger_ev_first_charging", "on")
     hass.states.async_set("binary_sensor.test_charger_ev_first_active", "on")
     rendered = Template(balance["content"], hass).async_render()
     assert "sharing is active" in rendered
@@ -233,6 +233,12 @@ async def test_forecast_message_follows_sharing_permission(hass: HomeAssistant, 
     assert "grid-export surplus" in rendered
     assert "18.75 kWh" in rendered
     assert "25% restart margin" in rendered
+    hass.states.async_set("select.test_charger_ev_first_charging", "on_once")
+    assert "Battery-first mode is active" in Template(balance["content"], hass).async_render()
+    controls = next(card for card in cards if card.get("type") == "entities")
+    assert any(row.get("entity") == "select.test_charger_ev_first_charging" for row in controls["entities"])
+    hass.states.async_set("select.test_charger_ev_first_charging", "off")
+    assert "EV-first sharing is disabled" in Template(balance["content"], hass).async_render()
 
 
 async def test_actual_current_gauge_keeps_requested_limit_separate(
@@ -247,6 +253,11 @@ async def test_actual_current_gauge_keeps_requested_limit_separate(
     gauge = next(card for card in cards if card.get("name") == "Actual current")
     assert gauge["entity"] == "sensor.measured_current"
     assert gauge["max"] == 32
+    warning = next(card for card in cards if card.get("type") == "conditional" and "card" in card)
+    assert warning["conditions"] == [
+        {"entity": "binary_sensor.test_charger_ev_drawing_less_than_offered", "state": "on"}
+    ]
+    assert "EV drawing less than offered" in warning["card"]["content"]
     assert not any(card.get("name") == "Requested current" for card in cards)
     summary = next(card for card in cards if "Requested limit:" in card.get("content", ""))
     coordinator = config_entry.runtime_data.coordinator

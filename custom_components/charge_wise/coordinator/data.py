@@ -36,8 +36,10 @@ class ChargeWiseSnapshot:
     manual_current_a: float
     offpeak_current_a: float
     battery_protection_active: bool | None
+    ev_first_mode: str = "off"
     vehicle_connected: bool | None = None
     vehicle_charging: bool | None = None
+    ev_under_drawing: bool | None = None
     charger_session: ChargerSessionStatus | None = None
     charger_status_profile: str = "unknown"
     charger_raw_status: str | None = None

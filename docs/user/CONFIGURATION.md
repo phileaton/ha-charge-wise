@@ -112,9 +112,19 @@ seeded with the current reading, so the estimate is usable immediately and impro
 restarts and shown by the diagnostic **Average house consumption** sensor. The **learning window** (default 3 days)
 sets how quickly it adapts.
 
-**Battery target by sunset** (default 90 %) sets the battery's energy goal. Turn on **EV-first charging**,
-which also needs **Solar charging**. Forecast surplus means the trusted remaining forecast minus expected house
-consumption until sunset.
+**Battery target by sunset** (default 90 %) sets the battery's energy goal. Select **On** or **On until sunset** under
+**EV-first charging**, which also needs **Solar charging**. Forecast surplus means the trusted remaining forecast
+minus expected house consumption until sunset.
+
+- **Off** disables EV-first sharing.
+- **On** enables recurring EV-first sharing, including on future days.
+- **On until sunset** enables sharing for today only and returns to **Off** at sunset. Brief charging pauses do not cancel it.
+  The original sunset deadline survives restarts. This choice requires a future sunset for today from the Sun integration;
+  after sunset, choose **On** for recurring sharing instead.
+
+The mode survives Home Assistant restarts. When upgrading from the EV-first switch, the new dropdown starts **Off**.
+Update automations referencing the removed switch to use the **EV-first charging** select with `select.select_option`
+and the option `off`, `on`, or `on_once`.
 
 EV-first sharing stops immediately when forecast surplus is at or below the battery's remaining need. A new sharing
 session requires surplus above battery need plus the **EV-first restart surplus margin** (default 25 %).
@@ -169,8 +179,8 @@ protection binary sensor is created only when a battery-power entity is configur
 
 Each entry creates:
 
-- **Charging enabled**, **Solar charging**, **Manual override** and **EV-first charging** switches, and an
-  **Off-peak charging** dropdown.
+- **Charging enabled**, **Solar charging**, and **Manual override** switches, plus **EV-first charging** and
+  **Off-peak charging** dropdowns.
 - **Manual current** and **Off-peak current** numbers. On first install both start at the charger maximum; after that
   they keep their last value across restarts.
 - **Controller status** sensor with the stable states Off, Waiting, Charging, Paused, and Error.

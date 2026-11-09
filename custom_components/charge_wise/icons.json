@@ -69,12 +69,12 @@
       },
       "manual_override": {
         "default": "mdi:hand-back-right"
-      },
-      "ev_first_enabled": {
-        "default": "mdi:car-electric-outline"
       }
     },
     "select": {
+      "ev_first_mode": {
+        "default": "mdi:car-electric-outline"
+      },
       "offpeak_mode": {
         "default": "mdi:clock-time-three-outline"
       }

@@ -146,6 +146,21 @@ def _battery_and_ev_section(
 ) -> list[Card]:
     """Return charging status, its reason and compact battery and EV readings."""
     cards = [_heading("Charging status", "mdi:ev-station")]
+    if (warning := ids.get("ev_under_drawing")) and options.get(CONF_CHARGER_CURRENT_ENTITY):
+        cards.append(
+            {
+                "type": "conditional",
+                "conditions": [{"entity": warning, "state": "on"}],
+                "card": {
+                    "type": "markdown",
+                    "content": "⚠️ **EV drawing less than offered**\n\n"
+                    "The EV has drawn at least 20% and 2 A below the charger limit for 5 minutes. "
+                    "The vehicle may be limiting its charging rate. "
+                    "This can be normal near its charge target or while its battery heats or cools.",
+                },
+                "grid_options": {"columns": 12},
+            }
+        )
     if "controller_status" in ids:
         cards.append(_tile(ids["controller_status"], "Status", "purple", trend=False))
     if "ev_first_active" in ids:
@@ -282,7 +297,7 @@ def _budget_summary(ids: Mapping[str, str], options: Mapping[str, Any]) -> Card:
     need = ids["battery_need"]
     surplus = ids["forecast_surplus"]
     active = ids.get("ev_first_active", "")
-    enabled = ids.get("ev_first_enabled", "")
+    enabled = ids.get("ev_first_mode", "")
     margin = float(options.get(CONF_EV_FIRST_RELEASE_MARGIN_PERCENT, DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT))
     content = (
         f"{{% set need = states('{need}') | float(none) %}}"
@@ -294,7 +309,7 @@ def _budget_summary(ids: Mapping[str, str], options: Mapping[str, Any]) -> Card:
         f"{{% if is_state('{active}', 'on') %}}"
         "{% if need <= 0 %}Battery target reached; battery-first priority is off. Solar charging is available."
         "{% else %}EV-first sharing is active; forecast surplus exceeds the battery's remaining need.{% endif %}"
-        f"{{% elif is_state('{enabled}', 'on') %}}"
+        f"{{% elif states('{enabled}') in ['on', 'on_once'] %}}"
         "Battery-first mode is active. EV-first sharing is off; the EV may charge from sustained grid-export surplus. "
         "EV-first sharing can resume when forecast surplus exceeds "
         f"{{{{ (need * (1 + {margin} / 100)) | round(2) }}}} kWh "
@@ -405,7 +420,7 @@ def _controls_section(ids: Mapping[str, str], control_keys: tuple[str, ...]) -> 
     names = {
         "enabled": "Charging enabled",
         "solar_enabled": "Solar charging",
-        "ev_first_enabled": "EV-first charging",
+        "ev_first_mode": "EV-first charging",
         "offpeak_mode": "Off-peak charging",
         "manual_override": "Manual override",
         "manual_current": "Manual current",
