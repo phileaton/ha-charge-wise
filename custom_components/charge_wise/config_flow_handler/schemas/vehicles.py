@@ -23,4 +23,9 @@ def vehicle_schema() -> probatio.Schema:
     for key, (domains, _) in VEHICLE_FIELDS.items():
         marker = probatio.Required(key) if key == "battery_entity" else probatio.Optional(key)
         fields[marker] = selector.EntitySelector(selector.EntitySelectorConfig(domain=domains))
+    fields[probatio.Optional("battery_capacity_kwh")] = selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=0.1, max=1000, step=0.1, unit_of_measurement="kWh", mode=selector.NumberSelectorMode.BOX
+        )
+    )
     return probatio.Schema(fields)

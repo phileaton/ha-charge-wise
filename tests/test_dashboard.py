@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.charge_wise.const import (
@@ -351,3 +352,79 @@ async def test_restart_cooldown_card_uses_live_relative_deadline(
     assert card["card"]["entities"] == [
         {"entity": "sensor.test_charger_restart_cooldown_ends", "time_format": "relative"}
     ]
+
+
+@pytest.mark.parametrize(
+    ("changes", "vehicle_changes", "expected"),
+    [
+        ({}, {}, "Estimated time to target:** 4 h 0 min"),
+        ({"sensor.ev_power": ("10000", "W")}, {}, "Estimated time to target:** 4 h 0 min"),
+        ({"sensor.ev_power": ("9.99", "kW")}, {}, "Estimated time to target:** 4 h 1 min"),
+        ({"number.ev_target": ("80", "kWh")}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_battery": ("40", "kWh")}, {}, "Time to finish:** Unavailable"),
+        ({}, {"charging_entity": None, "connected_entity": None}, "Estimated time to target:** 4 h 0 min"),
+        ({}, {"charge_target_entity": None}, "Estimated time to target:** 6 h 0 min"),
+        ({"sensor.ev_time": ("90", "min")}, {"time_remaining_entity": "sensor.ev_time"}, "Time to finish:** 90.0 min"),
+        (
+            {"sensor.ev_time": ("unavailable", "min")},
+            {"time_remaining_entity": "sensor.ev_time"},
+            "Estimated time to target:** 4 h 0 min",
+        ),
+        (
+            {"sensor.ev_time": ("-1", "min")},
+            {"time_remaining_entity": "sensor.ev_time"},
+            "Estimated time to target:** 4 h 0 min",
+        ),
+        ({"sensor.ev_power": ("0", "kW")}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_power": ("-1", "kW")}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_power": ("unavailable", "kW")}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_power": ("inf", "kW")}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_power": ("10", "mph")}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_battery": ("unknown", "%")}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_battery": ("101", "%")}, {}, "Time to finish:** Unavailable"),
+        ({"number.ev_target": ("unavailable", "%")}, {}, "Time to finish:** Unavailable"),
+        ({"binary_sensor.ev_charging": ("off", None)}, {}, "Time to finish:** Unavailable"),
+        ({"binary_sensor.ev_charging": ("unknown", None)}, {}, "Time to finish:** Unavailable"),
+        ({"binary_sensor.ev_plugged": ("off", None)}, {}, "Time to finish:** Unavailable"),
+        ({"sensor.ev_battery": ("80", "%")}, {}, "Estimated time to target:** 0 h 0 min"),
+    ],
+)
+async def test_vehicle_charge_time_estimate(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    changes: dict[str, tuple[str, str | None]],
+    vehicle_changes: dict[str, Any],
+    expected: str,
+) -> None:
+    """Estimate only from valid current readings, prefer native time, and honor paused states."""
+    readings = {
+        "sensor.ev_battery": ("40", "%"),
+        "number.ev_target": ("80", "%"),
+        "sensor.ev_power": ("10", "kW"),
+        "binary_sensor.ev_charging": ("on", None),
+        "binary_sensor.ev_plugged": ("on", None),
+        **changes,
+    }
+    for entity_id, (value, unit) in readings.items():
+        hass.states.async_set(entity_id, value, {"unit_of_measurement": unit} if unit else {})
+    vehicle = {
+        "id": "tesla",
+        "name": "Tesla",
+        "battery_entity": "sensor.ev_battery",
+        "battery_capacity_kwh": 100,
+        "charge_target_entity": "number.ev_target",
+        "charging_power_entity": "sensor.ev_power",
+        "charging_entity": "binary_sensor.ev_charging",
+        "connected_entity": "binary_sensor.ev_plugged",
+        **vehicle_changes,
+    }
+    vehicle = {key: value for key, value in vehicle.items() if value is not None}
+    await _setup(hass, config_entry, create=True, options={"vehicles": [vehicle]})
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    section = next(s for s in config["views"][0]["sections"] if s["cards"][0].get("heading") == "Vehicles")
+    content = section["cards"][1]["cards"][1]["content"]
+    rendered = Template(content, hass).async_render()
+    assert expected in rendered
+    assert rendered.count("time to target") + rendered.count("Time to finish") == 1
+    if "Estimated time" in expected:
+        assert "at the current rate" in rendered

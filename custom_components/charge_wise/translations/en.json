@@ -361,7 +361,8 @@
           "charging_entity": "Charging",
           "charging_power_entity": "Charging power",
           "range_entity": "Remaining range",
-          "time_remaining_entity": "Time to finish"
+          "time_remaining_entity": "Time to finish",
+          "battery_capacity_kwh": "Usable battery capacity"
         },
         "data_description": {
           "name": "Name shown on this vehicle’s dashboard card.",
@@ -371,7 +372,8 @@
           "charging_entity": "Optional binary sensor: on means the vehicle is charging.",
           "charging_power_entity": "Optional power sensor reporting W or kW.",
           "range_entity": "Optional remaining range sensor reporting km, mi or m.",
-          "time_remaining_entity": "Optional remaining charging duration sensor reporting seconds, minutes or hours."
+          "time_remaining_entity": "Optional remaining charging duration sensor reporting seconds, minutes or hours.",
+          "battery_capacity_kwh": "Optional usable battery capacity in kWh. Requires a selected charging power sensor. Estimates time to the charge target (100% if no target is selected) when the vehicle has no valid time remaining. Assumes constant power and excludes charging losses and tapering. Clear to disable estimates."
         }
       },
       "vehicle_details": {
@@ -385,7 +387,8 @@
           "charging_entity": "Charging",
           "charging_power_entity": "Charging power",
           "range_entity": "Remaining range",
-          "time_remaining_entity": "Time to finish"
+          "time_remaining_entity": "Time to finish",
+          "battery_capacity_kwh": "Usable battery capacity"
         },
         "data_description": {
           "name": "Name shown on this vehicle’s dashboard card.",
@@ -395,7 +398,8 @@
           "charging_entity": "Optional binary sensor: on means the vehicle is charging.",
           "charging_power_entity": "Optional power sensor reporting W or kW.",
           "range_entity": "Optional remaining range sensor reporting km, mi or m.",
-          "time_remaining_entity": "Optional remaining charging duration sensor reporting seconds, minutes or hours."
+          "time_remaining_entity": "Optional remaining charging duration sensor reporting seconds, minutes or hours.",
+          "battery_capacity_kwh": "Optional usable battery capacity in kWh. Requires a selected charging power sensor. Estimates time to the charge target (100% if no target is selected) when the vehicle has no valid time remaining. Assumes constant power and excludes charging losses and tapering. Clear to disable estimates."
         }
       },
       "vehicle_edit": {
@@ -441,7 +445,9 @@
       "vehicle_name_required": "Enter a display name.",
       "vehicle_entity_required": "Select a battery percentage sensor.",
       "vehicle_invalid_entity": "Select an existing reading of the required type.",
-      "vehicle_invalid_unit": "The selected reading uses an unsupported unit. Choose a reading with the units described above."
+      "vehicle_invalid_unit": "The selected reading uses an unsupported unit. Choose a reading with the units described above.",
+      "vehicle_invalid_capacity": "Enter a finite battery capacity between 0.1 and 1000 kWh.",
+      "vehicle_estimate_power_required": "Select a charging power sensor to estimate the remaining charging time."
     }
   },
   "exceptions": {
@@ -653,7 +659,11 @@
         "time_remaining_entity": "Time to finish",
         "yes": "Yes",
         "no": "No",
-        "unavailable": "Unavailable"
+        "unavailable": "Unavailable",
+        "estimated_time_remaining": "Estimated time to target",
+        "hours_unit": "h",
+        "minutes_unit": "min",
+        "at_current_rate": "at the current rate"
       }
     }
   }

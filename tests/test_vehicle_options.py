@@ -133,3 +133,47 @@ async def test_remove_last_vehicle(hass: HomeAssistant, config_entry: MockConfig
     assert "vehicle_edit" not in result["menu_options"]
     result = await _step(hass, result, {"next_step_id": "vehicle_save"})
     assert result["data"] == {**original, "vehicles": []}
+
+
+async def test_vehicle_capacity_requires_power_and_can_be_edited_and_cleared(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Capacity is optional, requires a power source, and survives editing until explicitly cleared."""
+    hass.states.async_set("sensor.ev_battery", "40", {"unit_of_measurement": "%"})
+    hass.states.async_set("sensor.ev_power", "10", {"unit_of_measurement": "kW"})
+    result = await _vehicles(hass, config_entry)
+    result = await _step(hass, result, {"next_step_id": "vehicle_add"})
+    values = {"name": "Tesla", "battery_entity": "sensor.ev_battery", "battery_capacity_kwh": 100}
+    result = await _step(hass, result, values)
+    assert result["errors"] == {"charging_power_entity": "vehicle_estimate_power_required"}
+    values["charging_power_entity"] = "sensor.ev_power"
+    result = await _step(hass, result, values)
+    result = await _step(hass, result, {"next_step_id": "vehicle_edit"})
+    vehicle_id = next(iter(result["data_schema"].schema.values())).config["options"][0]["value"]
+    result = await _step(hass, result, {"vehicle_id": vehicle_id})
+    fields = {str(marker): marker for marker in result["data_schema"].schema}
+    assert fields["battery_capacity_kwh"].description["suggested_value"] == 100
+    result = await _step(hass, result, {**values, "battery_capacity_kwh": 95.5})
+    result = await _step(hass, result, {"next_step_id": "vehicle_save"})
+    assert result["data"]["vehicles"][0]["battery_capacity_kwh"] == 95.5
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    result = await _step(hass, result, {"next_step_id": "vehicles"})
+    result = await _step(hass, result, {"next_step_id": "vehicle_edit"})
+    result = await _step(hass, result, {"vehicle_id": vehicle_id})
+    result = await _step(hass, result, {"name": "Tesla", "battery_entity": "sensor.ev_battery"})
+    result = await _step(hass, result, {"next_step_id": "vehicle_save"})
+    assert "battery_capacity_kwh" not in result["data"]["vehicles"][0]
+
+
+@pytest.mark.parametrize("capacity", [0, -1, 1001])
+async def test_vehicle_capacity_selector_rejects_out_of_range(
+    hass: HomeAssistant, config_entry: MockConfigEntry, capacity: float
+) -> None:
+    """Invalid capacities are rejected before they can be saved."""
+    hass.states.async_set("sensor.ev_battery", "40", {"unit_of_measurement": "%"})
+    result = await _vehicles(hass, config_entry)
+    result = await _step(hass, result, {"next_step_id": "vehicle_add"})
+    with pytest.raises(InvalidData):
+        await _step(
+            hass, result, {"name": "Tesla", "battery_entity": "sensor.ev_battery", "battery_capacity_kwh": capacity}
+        )

@@ -1,5 +1,6 @@
 """Validate source readings for display-only vehicles."""
 
+from math import isfinite
 from typing import Any
 
 from custom_components.charge_wise.config_flow_handler.schemas.vehicles import VEHICLE_FIELDS
@@ -12,6 +13,16 @@ def validate_vehicle(hass: HomeAssistant, values: dict[str, Any]) -> dict[str, s
     errors: dict[str, str] = {}
     if not values.get("name", "").strip():
         errors["name"] = "vehicle_name_required"
+    if (capacity := values.get("battery_capacity_kwh")) is not None:
+        if (
+            isinstance(capacity, bool)
+            or not isinstance(capacity, (float, int))
+            or not isfinite(capacity)
+            or not 0.1 <= capacity <= 1000
+        ):
+            errors["battery_capacity_kwh"] = "vehicle_invalid_capacity"
+        elif not values.get("charging_power_entity"):
+            errors["charging_power_entity"] = "vehicle_estimate_power_required"
     registry = er.async_get(hass)
     for key, (domains, units) in VEHICLE_FIELDS.items():
         entity_id = values.get(key)
