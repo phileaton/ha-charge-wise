@@ -174,6 +174,19 @@ def _battery_and_ev_section(
                 "grid_options": {"columns": 12},
             }
         )
+    if (deadline := ids.get("restart_cooldown_end")) and (reason := ids.get("decision_reason")):
+        cards.append(
+            {
+                "type": "conditional",
+                "conditions": [{"entity": reason, "state": "cooldown"}],
+                "card": {
+                    "type": "entities",
+                    "show_header_toggle": False,
+                    "entities": [{"entity": deadline, "time_format": "relative"}],
+                },
+                "grid_options": {"columns": 12},
+            }
+        )
     if level := options.get(CONF_BATTERY_LEVEL_ENTITY):
         cards.append(
             {

@@ -39,6 +39,7 @@ _OWN_ENTITIES = (
     *_CONTROLS,
     ("sensor", "controller_status"),
     ("sensor", "decision_reason"),
+    ("sensor", "restart_cooldown_end"),
     ("sensor", "requested_current"),
     ("sensor", "available_solar_budget"),
     ("sensor", "house_load"),

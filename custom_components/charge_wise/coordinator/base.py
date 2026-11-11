@@ -630,6 +630,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             next_offpeak_start=next_offpeak_start,
             status=status or decision.status,
             reason=reason or decision.reason,
+            restart_cooldown_end=(
+                self.controller.cooldown_until if (reason or decision.reason) is ChargeWiseReason.COOLDOWN else None
+            ),
             available_solar_w=(
                 decision.available_solar_w
                 if decision.available_solar_w is not None

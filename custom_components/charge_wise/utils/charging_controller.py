@@ -143,6 +143,11 @@ class ChargeWiseController:
         self._solar_samples: list[tuple[datetime, float]] = []
         self._hold_until: datetime | None = None
 
+    @property
+    def cooldown_until(self) -> datetime | None:
+        """Return the restart deadline independently of other pending evaluations."""
+        return self._cooldown_until
+
     def start_cooldown(self, now: datetime) -> None:
         """Delay a Solar start after a restart so restored switches never cause an immediate start."""
         self._cooldown_until = now + timedelta(seconds=self.config.cooldown_s)

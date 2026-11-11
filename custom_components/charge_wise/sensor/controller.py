@@ -83,6 +83,12 @@ ENTITY_DESCRIPTIONS: tuple[ChargeWiseSensorEntityDescription, ...] = (
         value_fn=lambda data: data.requested_current_a,
     ),
     ChargeWiseSensorEntityDescription(
+        key="restart_cooldown_end",
+        translation_key="restart_cooldown_end",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.restart_cooldown_end,
+    ),
+    ChargeWiseSensorEntityDescription(
         key="next_offpeak_window",
         translation_key="next_offpeak_window",
         device_class=SensorDeviceClass.TIMESTAMP,

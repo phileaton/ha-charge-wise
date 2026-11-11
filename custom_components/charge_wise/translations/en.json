@@ -571,6 +571,9 @@
             "name": "Charging source"
           }
         }
+      },
+      "restart_cooldown_end": {
+        "name": "Restart cooldown ends"
       }
     },
     "binary_sensor": {

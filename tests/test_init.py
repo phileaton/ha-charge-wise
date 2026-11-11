@@ -1,5 +1,7 @@
 """Tests for Charge Wise config-entry setup and cleanup."""
 
+from datetime import timedelta
+
 from freezegun.api import FrozenDateTimeFactory
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -8,6 +10,7 @@ from custom_components.charge_wise.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
 
 async def test_entry_unloads_cleanly(
@@ -162,3 +165,31 @@ async def test_legacy_demo_entry_has_an_actionable_setup_error(
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_ERROR
     assert "Remove it and add Charge Wise again with your charger entities" in entry.reason
+
+
+async def test_restart_cooldown_deadline_clears_after_wait(
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
+) -> None:
+    """Publish the actual cooldown deadline, retain it while waiting, then clear it."""
+    registry = er.async_get(hass)
+    deadline_id = registry.async_get_entity_id("sensor", DOMAIN, f"{init_integration.entry_id}_restart_cooldown_end")
+    reason_id = registry.async_get_entity_id("sensor", DOMAIN, f"{init_integration.entry_id}_decision_reason")
+    assert deadline_id and reason_id
+    assert hass.states.get(deadline_id).state == "unknown"
+    now = dt_util.utcnow()
+    await _turn_on(hass, init_integration, "enabled", "solar_enabled")
+    hass.states.async_set("sensor.grid_power", "-3000", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert hass.states.get(reason_id).state == "cooldown"
+    deadline = dt_util.parse_datetime(hass.states.get(deadline_id).state)
+    assert deadline == now + timedelta(seconds=init_integration.options["cooldown_s"])
+    assert hass.states.get(deadline_id).attributes["device_class"] == "timestamp"
+    freezer.tick(30)
+    hass.states.async_set("sensor.grid_power", "-3100", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert dt_util.parse_datetime(hass.states.get(deadline_id).state) == deadline
+    freezer.tick(init_integration.options["cooldown_s"])
+    hass.states.async_set("sensor.grid_power", "-3200", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert hass.states.get(reason_id).state != "cooldown"
+    assert hass.states.get(deadline_id).state == "unknown"

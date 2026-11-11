@@ -337,3 +337,17 @@ async def test_multiple_vehicle_cards_render_read_only_status(
     hass.states.async_set("binary_sensor.ev_charging", "unknown")
     assert "Charging:** Unavailable" in Template(content, hass).async_render()
     assert hass.states.get("number.ev_target").state == "80"
+
+
+async def test_restart_cooldown_card_uses_live_relative_deadline(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Only show the cooldown row while waiting, using frontend-managed relative time."""
+    await _setup(hass, config_entry, create=True)
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    status = config["views"][0]["sections"][0]["cards"]
+    card = next(card for card in status if card.get("type") == "conditional" and card["card"].get("type") == "entities")
+    assert card["conditions"] == [{"entity": "sensor.test_charger_decision_reason", "state": "cooldown"}]
+    assert card["card"]["entities"] == [
+        {"entity": "sensor.test_charger_restart_cooldown_ends", "time_format": "relative"}
+    ]

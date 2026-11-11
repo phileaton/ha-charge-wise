@@ -36,6 +36,7 @@ class ChargeWiseSnapshot:
     manual_current_a: float
     offpeak_current_a: float
     battery_protection_active: bool | None
+    restart_cooldown_end: datetime | None = None
     ev_first_mode: str = "off"
     vehicle_connected: bool | None = None
     vehicle_charging: bool | None = None
