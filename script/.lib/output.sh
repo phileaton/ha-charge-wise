@@ -121,13 +121,15 @@ resolve_venv_path() {
 }
 
 # Activate the Home Assistant virtual environment if not already active.
-# Silently skips when VIRTUAL_ENV is already set (e.g. in CI or nested calls).
+# Reuse an active environment only when its Python is first on PATH.
 activate_venv() {
-    if [[ -n ${VIRTUAL_ENV:-} ]]; then
+    if [[ -n ${VIRTUAL_ENV:-} && $(command -v python) == "$VIRTUAL_ENV/bin/python" && $(command -v python3) == "$VIRTUAL_ENV/bin/python3" ]]; then
         return 0
     fi
     local venv_path
-    if ! venv_path="$(resolve_venv_path)"; then
+    if [[ -n ${VIRTUAL_ENV:-} && -f "$VIRTUAL_ENV/bin/activate" ]]; then
+        venv_path="$VIRTUAL_ENV"
+    elif ! venv_path="$(resolve_venv_path)"; then
         log_error "Virtual environment not found. Run: script/setup/bootstrap"
         exit 1
     fi
