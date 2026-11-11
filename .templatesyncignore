@@ -141,3 +141,6 @@ uv.lock
 
 # Preserve environment activation when inherited PATH and VIRTUAL_ENV disagree.
 script/.lib/output.sh
+
+# Include Core's standalone validator package after the 2026.11 split.
+script/hassfest

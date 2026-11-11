@@ -162,11 +162,13 @@ if ! python3 -c "import probatio, awesomeversion, homeassistant.helpers.config_v
     exit 1
 fi
 
+git -C "$HA_CORE_DIR" sparse-checkout add /packages/hassfest/
+
 # Resolve HA_CORE_DIR to an absolute path (may already be absolute in DevContainer)
 HA_CORE_ABS="$(cd "$HA_CORE_DIR" && pwd)"
 
 # Export PYTHONPATH to include HA Core
-export PYTHONPATH="$HA_CORE_ABS:${PYTHONPATH:-}"
+export PYTHONPATH="$HA_CORE_ABS/packages/hassfest:$HA_CORE_ABS:${PYTHONPATH:-}"
 
 # Build hassfest command
 HASSFEST_CMD=(
