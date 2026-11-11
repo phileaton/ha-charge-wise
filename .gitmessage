@@ -1,0 +1,13 @@
+# <type>(<scope>): <subject (max 72 chars)>
+#
+# Types: feat, fix, chore, refactor, docs, test, ci, perf
+# Example: feat(coordinator): add retry logic for failed requests
+#
+# <body: explain WHAT and WHY, not HOW>
+# - Bullet point format
+# - One per logical change
+# - Include all non-trivial changes
+#
+# BREAKING CHANGE: Description (required if breaking, triggers major version bump)
+#
+# Closes #issue_number (if applicable)

@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "Development tools for the Home Assistant integration",
   "private": true,
+  "scripts": {
+    "prepare": "husky install"
+  },
   "devDependencies": {
     "@commitlint/cli": "21.2.1",
     "@commitlint/config-conventional": "21.2.0",
     "@github/copilot": "1.0.24",
+    "husky": "^9.1.7",
     "markdownlint-cli2": "0.22.0",
     "prettier": "3.8.2",
     "pyright": "1.1.408"
