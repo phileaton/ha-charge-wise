@@ -178,11 +178,13 @@ async def test_restart_cooldown_deadline_clears_after_wait(
     assert hass.states.get(deadline_id).state == "unknown"
     now = dt_util.utcnow()
     await _turn_on(hass, init_integration, "enabled", "solar_enabled")
+    hass.states.async_set("sensor.grid_power", "unavailable", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
     hass.states.async_set("sensor.grid_power", "-3000", {"unit_of_measurement": "W"})
     await hass.async_block_till_done()
     assert hass.states.get(reason_id).state == "cooldown"
     deadline = dt_util.parse_datetime(hass.states.get(deadline_id).state)
-    assert deadline == now + timedelta(seconds=init_integration.options["cooldown_s"])
+    assert deadline == now.replace(microsecond=0) + timedelta(seconds=init_integration.options["cooldown_s"])
     assert hass.states.get(deadline_id).attributes["device_class"] == "timestamp"
     freezer.tick(30)
     hass.states.async_set("sensor.grid_power", "-3100", {"unit_of_measurement": "W"})
