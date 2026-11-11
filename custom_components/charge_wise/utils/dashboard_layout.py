@@ -390,6 +390,20 @@ def _solar_section(
                             "grid_options": {"columns": 6},
                         },
                     )
+                cards.append(
+                    {
+                        "type": "markdown",
+                        "title": "Graph troubleshooting",
+                        "content": (
+                            "The forecast comparison graph below requires **ApexCharts Card 2.2.0 or newer**. "
+                            "If it shows **Configuration error**, install or update **ApexCharts Card** in HACS, "
+                            "check that its JavaScript resource is registered under "
+                            "**Settings → Dashboards → Resources**, then refresh your browser. "
+                            "[Installation instructions](https://github.com/RomRider/apexcharts-card#installation)"
+                        ),
+                        "grid_options": {"columns": "full"},
+                    },
+                )
                 cards.append(_solar_forecast_graph(forecast_today, solar, solar_power_scale_to_kw))
     power = [
         entity

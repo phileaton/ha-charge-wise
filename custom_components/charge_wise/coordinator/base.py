@@ -984,6 +984,20 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         if state.state == option:
             return True
 
+        if enabled:
+            current_entity = self.options[CONF_CURRENT_TARGET_ENTITY]
+            current = self._number_value(current_entity)
+            if current is None:
+                raise HomeAssistantError(f"Session current limit {current_entity} is unavailable")
+            maximum = self.maximum_current_a
+            if not isclose(current, maximum, abs_tol=0.01):
+                await self.hass.services.async_call(
+                    "number", "set_value", {ATTR_ENTITY_ID: current_entity, "value": maximum}, blocking=True
+                )
+                current = self._number_value(current_entity)
+                if current is None or not isclose(current, maximum, abs_tol=0.01):
+                    return False
+
         if not await self._async_stop_for_native_change():
             return False
 

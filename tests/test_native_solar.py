@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.charge_wise.const import DOMAIN
+from homeassistant.components.number import NumberEntity
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
@@ -33,6 +34,22 @@ class ChargerSwitch(SwitchEntity):
     async def async_turn_off(self, **kwargs: object) -> None:
         """Disable the charger."""
         self._attr_is_on = False
+        self.async_write_ha_state()
+
+
+class SessionLimit(NumberEntity):
+    """A session limit that reports accepted commands."""
+
+    _attr_name = "Current Limit"
+    _attr_unique_id = "native_test_current"
+    _attr_native_value = 6
+    _attr_native_min_value = 6
+    _attr_native_max_value = 32
+    _attr_native_step = 1
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Publish the accepted limit."""
+        self._attr_native_value = value
         self.async_write_ha_state()
 
 
@@ -68,6 +85,9 @@ async def native_entry(hass: HomeAssistant, config_entry: MockConfigEntry) -> tu
     charger = ChargerSwitch()
     solar = ChargerSolar()
     hass.states.async_remove("switch.charger_enable")
+    hass.states.async_remove("number.current_limit")
+    setup_test_component_platform(hass, "number", [SessionLimit()])
+    assert await async_setup_component(hass, "number", {"number": [{"platform": "test"}]})
     setup_test_component_platform(hass, "switch", [charger])
     setup_test_component_platform(hass, "select", [solar])
     assert await async_setup_component(hass, "switch", {"switch": [{"platform": "test"}]})
@@ -127,12 +147,70 @@ async def test_native_solar_handoff_and_manual_override(
     assert hass.states.get(reason).state == "native_solar"
     assert hass.states.get("switch.charger_enable").state == "on"
     assert solar.commands == ["Full solar"]
-    assert not any(event.data["domain"] == "number" and event.data["service"] == "set_value" for event in calls)
+    assert float(hass.states.get("number.current_limit").state) == 32
+    charger_calls = [
+        (event.data["domain"], event.data["service"])
+        for event in calls
+        if event.data["service_data"].get("entity_id")
+        in ("number.current_limit", "switch.charger_enable", "select.charger_solar")
+    ]
+    assert charger_calls == [("number", "set_value"), ("select", "select_option"), ("switch", "turn_on")]
 
     await _switch(hass, entry, "manual_override")
     assert solar.commands == ["Full solar", "Off"]
     assert hass.states.get(reason).state == "manual"
     assert hass.states.get("switch.charger_enable").state == "on"
+
+
+async def test_native_handoff_resets_limit_before_disabling_control(
+    hass: HomeAssistant, native_entry: tuple[MockConfigEntry, ChargerSolar]
+) -> None:
+    """An active manual session releases its limit before Wallbox takes over."""
+    entry, solar = native_entry
+    await _switch(hass, entry, "enabled")
+    await _switch(hass, entry, "solar_enabled")
+    await _switch(hass, entry, "manual_override")
+    hass.states.async_set("number.hardware_maximum", "24")
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {"entity_id": _entity_id(hass, entry, "number", "manual_current"), "value": 10},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    calls = async_capture_events(hass, "call_service")
+    await _switch(hass, entry, "manual_override", on=False)
+    charger_calls = [
+        (event.data["domain"], event.data["service"])
+        for event in calls
+        if event.data["service_data"].get("entity_id")
+        in ("number.current_limit", "switch.charger_enable", "select.charger_solar")
+    ]
+    assert charger_calls == [
+        ("number", "set_value"),
+        ("switch", "turn_off"),
+        ("select", "select_option"),
+        ("switch", "turn_on"),
+    ]
+    assert float(hass.states.get("number.current_limit").state) == 24
+    assert hass.states.get("switch.charger_enable").state == "on"
+    assert solar.commands == ["Full solar", "Off", "Full solar"]
+    hass.states.async_set("sensor.grid_power", "-1000", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert hass.states.get("switch.charger_enable").state == "on"
+
+
+async def test_unavailable_session_limit_prevents_native_handoff(
+    hass: HomeAssistant, native_entry: tuple[MockConfigEntry, ChargerSolar]
+) -> None:
+    """Do not select native solar when its session limit cannot be released."""
+    entry, solar = native_entry
+    hass.states.async_set("number.current_limit", "unavailable")
+    await _switch(hass, entry, "enabled")
+    await _switch(hass, entry, "solar_enabled")
+    assert solar.commands == []
+    assert hass.states.get("switch.charger_enable").state == "off"
+    assert hass.states.get(_entity_id(hass, entry, "sensor", "decision_reason")).state == "control_failed"
 
 
 async def test_delayed_native_mode_confirmation_does_not_race_manual_override(

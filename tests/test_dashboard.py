@@ -102,6 +102,14 @@ async def test_dashboard_is_created_with_the_entry_entities(
     assert any(card["type"] == "gauge" for card in cards)
     assert any(card["type"] == "history-graph" for card in cards)
     chart = next(card for card in cards if card["type"] == "custom:apexcharts-card")
+    help_card = cards[cards.index(chart) - 1]
+    assert help_card["type"] == "markdown"
+    assert help_card["title"] == "Graph troubleshooting"
+    assert "ApexCharts Card 2.2.0 or newer" in help_card["content"]
+    assert "Configuration error" in help_card["content"]
+    assert "HACS" in help_card["content"]
+    assert "Resources" in help_card["content"]
+    assert "refresh your browser" in help_card["content"]
     assert chart["header"]["title"] == "Solar power: forecast vs actual (kW)"
     forecast_series, actual_series = chart["series"]
     assert "detailedForecast" in forecast_series["data_generator"]
@@ -212,6 +220,7 @@ async def test_dashboard_templates_render_the_live_flow(
     hass.states.async_set("sensor.test_charger_average_house_consumption", "2075", watts)
     assert "2.08 kW" in Template(average["content"], hass).async_render()
     assert not any(card["type"] == "custom:apexcharts-card" for card in cards)
+    assert not any(card.get("title") == "Graph troubleshooting" for card in cards)
 
 
 async def test_forecast_message_follows_sharing_permission(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
