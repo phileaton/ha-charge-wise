@@ -181,45 +181,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Connect charger entities",
-        "description": "Choose the Home Assistant entities Charge Wise will monitor and control, and the current limits.",
-        "data": {
-          "grid_power_entity": "Net grid power sensor",
-          "charger_power_entity": "Measured charger power sensor",
-          "charger_switch_entity": "Charger on/off switch",
-          "current_target_entity": "Active current target",
-          "hardware_maximum_entity": "Hardware maximum current",
-          "minimum_current_a": "Minimum operating current",
-          "maximum_current_a": "Safe maximum current",
-          "voltage_v": "Charging voltage",
-          "charger_status_entity": "Charger status / connection sensor",
-          "charger_status_profile": "Charger status profile",
-          "charger_states_disconnected": "Custom disconnected states",
-          "charger_states_idle": "Custom idle states",
-          "charger_states_charging": "Custom charging states",
-          "charger_states_paused": "Custom paused states",
-          "charger_states_finished": "Custom finished states",
-          "charger_states_fault": "Custom fault states",
-          "charger_current_entity": "Measured charger current"
-        },
-        "data_description": {
-          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
-          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
-          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
-          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
-          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
-          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
-          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
-          "voltage_v": "Single-phase voltage used to convert available power to current.",
-          "charger_status_entity": "Optional binary connection sensor (on means connected, off means disconnected), or charger status sensor interpreted using the selected profile. Binary sensors do not report session status.",
-          "charger_status_profile": "For status sensors: Automatic recognizes the supplying OCPP or Wallbox integration. Otherwise select a profile or Custom. Ignored for binary sensors.",
-          "charger_states_disconnected": "For the Custom profile only: enter each exact sensor value meaning disconnected. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
-          "charger_states_idle": "For the Custom profile only: enter each exact sensor value meaning idle. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
-          "charger_states_charging": "For the Custom profile only: enter each exact sensor value meaning charging. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
-          "charger_states_paused": "For the Custom profile only: enter each exact sensor value meaning paused. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
-          "charger_states_finished": "For the Custom profile only: enter each exact sensor value meaning finished. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
-          "charger_states_fault": "For the Custom profile only: enter each exact sensor value meaning fault. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
-          "charger_current_entity": "Optional measured current sensor in A for the dashboard. Without it, the gauge shows measured charging power. Do not select an offered current or current-limit sensor."
+        "title": "Charge Wise settings",
+        "menu_options": {
+          "charger": "Charger and energy settings",
+          "vehicles": "Vehicles"
         }
       },
       "solar": {
@@ -331,6 +296,127 @@
           "create_dashboard": "Adds a Charge Wise dashboard to the sidebar with this charger's controls and status. Untick to remove it.",
           "go_back": "Tick this and select Next or Submit to return to the previous page. Values on this page are kept."
         }
+      },
+      "charger": {
+        "title": "Connect charger entities",
+        "description": "Choose the Home Assistant entities Charge Wise will monitor and control, and the current limits.",
+        "data": {
+          "grid_power_entity": "Net grid power sensor",
+          "charger_power_entity": "Measured charger power sensor",
+          "charger_switch_entity": "Charger on/off switch",
+          "current_target_entity": "Active current target",
+          "hardware_maximum_entity": "Hardware maximum current",
+          "minimum_current_a": "Minimum operating current",
+          "maximum_current_a": "Safe maximum current",
+          "voltage_v": "Charging voltage",
+          "charger_status_entity": "Charger status / connection sensor",
+          "charger_status_profile": "Charger status profile",
+          "charger_states_disconnected": "Custom disconnected states",
+          "charger_states_idle": "Custom idle states",
+          "charger_states_charging": "Custom charging states",
+          "charger_states_paused": "Custom paused states",
+          "charger_states_finished": "Custom finished states",
+          "charger_states_fault": "Custom fault states",
+          "charger_current_entity": "Measured charger current"
+        },
+        "data_description": {
+          "grid_power_entity": "Positive values mean grid import and negative values mean export. Power units W, kW, or mW are accepted.",
+          "charger_power_entity": "The charger's measured power draw. Power units W, kW, or mW are accepted.",
+          "charger_switch_entity": "The switch Charge Wise uses to enable or stop charging.",
+          "current_target_entity": "A writable number entity for the active charging-current limit, in amperes.",
+          "hardware_maximum_entity": "Optional read-only hardware limit. The configured safe maximum still applies if this entity is unavailable.",
+          "minimum_current_a": "The lowest current Charge Wise may request, in amperes.",
+          "maximum_current_a": "Required safe ceiling used even when no hardware maximum entity is selected.",
+          "voltage_v": "Single-phase voltage used to convert available power to current.",
+          "charger_status_entity": "Optional binary connection sensor (on means connected, off means disconnected), or charger status sensor interpreted using the selected profile. Binary sensors do not report session status.",
+          "charger_status_profile": "For status sensors: Automatic recognizes the supplying OCPP or Wallbox integration. Otherwise select a profile or Custom. Ignored for binary sensors.",
+          "charger_states_disconnected": "For the Custom profile only: enter each exact sensor value meaning disconnected. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_idle": "For the Custom profile only: enter each exact sensor value meaning idle. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_charging": "For the Custom profile only: enter each exact sensor value meaning charging. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_paused": "For the Custom profile only: enter each exact sensor value meaning paused. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_finished": "For the Custom profile only: enter each exact sensor value meaning finished. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_states_fault": "For the Custom profile only: enter each exact sensor value meaning fault. Leave ambiguous values unmapped. Idle means connected and waiting; finished means the session explicitly ended.",
+          "charger_current_entity": "Optional measured current sensor in A for the dashboard. Without it, the gauge shows measured charging power. Do not select an offered current or current-limit sensor."
+        }
+      },
+      "vehicles": {
+        "title": "Vehicles",
+        "description": "Add or update vehicle status cards. These readings only affect the dashboard. Choose Save vehicles to apply your changes.",
+        "menu_options": {
+          "vehicle_add": "Add vehicle",
+          "vehicle_edit": "Edit vehicle",
+          "vehicle_remove": "Remove vehicle",
+          "vehicle_save": "Save vehicles",
+          "init": "Back to settings"
+        }
+      },
+      "vehicle_add": {
+        "title": "Add vehicle",
+        "description": "Choose existing Home Assistant readings. Leave optional readings empty to hide them. Remove a selected reading to stop displaying it. Changes apply when you choose Save vehicles.",
+        "data": {
+          "name": "Display name",
+          "battery_entity": "Battery percentage",
+          "charge_target_entity": "Charge target",
+          "connected_entity": "Plugged in",
+          "charging_entity": "Charging",
+          "charging_power_entity": "Charging power",
+          "range_entity": "Remaining range",
+          "time_remaining_entity": "Time to finish"
+        },
+        "data_description": {
+          "name": "Name shown on this vehicle’s dashboard card.",
+          "battery_entity": "Required vehicle battery sensor reporting a percentage.",
+          "charge_target_entity": "Optional sensor or number reporting the target percentage. Displayed read-only.",
+          "connected_entity": "Optional binary sensor: on means the vehicle is plugged in.",
+          "charging_entity": "Optional binary sensor: on means the vehicle is charging.",
+          "charging_power_entity": "Optional power sensor reporting W or kW.",
+          "range_entity": "Optional remaining range sensor reporting km, mi or m.",
+          "time_remaining_entity": "Optional remaining charging duration sensor reporting seconds, minutes or hours."
+        }
+      },
+      "vehicle_details": {
+        "title": "Edit vehicle",
+        "description": "Choose existing Home Assistant readings. Leave optional readings empty to hide them. Remove a selected reading to stop displaying it. Changes apply when you choose Save vehicles.",
+        "data": {
+          "name": "Display name",
+          "battery_entity": "Battery percentage",
+          "charge_target_entity": "Charge target",
+          "connected_entity": "Plugged in",
+          "charging_entity": "Charging",
+          "charging_power_entity": "Charging power",
+          "range_entity": "Remaining range",
+          "time_remaining_entity": "Time to finish"
+        },
+        "data_description": {
+          "name": "Name shown on this vehicle’s dashboard card.",
+          "battery_entity": "Required vehicle battery sensor reporting a percentage.",
+          "charge_target_entity": "Optional sensor or number reporting the target percentage. Displayed read-only.",
+          "connected_entity": "Optional binary sensor: on means the vehicle is plugged in.",
+          "charging_entity": "Optional binary sensor: on means the vehicle is charging.",
+          "charging_power_entity": "Optional power sensor reporting W or kW.",
+          "range_entity": "Optional remaining range sensor reporting km, mi or m.",
+          "time_remaining_entity": "Optional remaining charging duration sensor reporting seconds, minutes or hours."
+        }
+      },
+      "vehicle_edit": {
+        "title": "Choose a vehicle to edit",
+        "description": "Choose a vehicle. Removal takes effect when you choose Save vehicles.",
+        "data": {
+          "vehicle_id": "Vehicle"
+        },
+        "data_description": {
+          "vehicle_id": "The configured vehicle to change."
+        }
+      },
+      "vehicle_remove": {
+        "title": "Remove vehicle",
+        "description": "Choose a vehicle. Removal takes effect when you choose Save vehicles.",
+        "data": {
+          "vehicle_id": "Vehicle"
+        },
+        "data_description": {
+          "vehicle_id": "The configured vehicle to change."
+        }
       }
     },
     "error": {
@@ -351,7 +437,11 @@
       "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty.",
       "invalid_status_mapping": "Enter at least one custom status. Values must be unique across all groups and cannot be unknown or unavailable.",
       "status_profile_required": "The supplying integration is not recognized. Select OCPP, Wallbox or Custom for this status sensor.",
-      "invalid_current_unit": "Select a measured current sensor reporting amperes (A)."
+      "invalid_current_unit": "Select a measured current sensor reporting amperes (A).",
+      "vehicle_name_required": "Enter a display name.",
+      "vehicle_entity_required": "Select a battery percentage sensor.",
+      "vehicle_invalid_entity": "Select an existing reading of the required type.",
+      "vehicle_invalid_unit": "The selected reading uses an unsupported unit. Choose a reading with the units described above."
     }
   },
   "exceptions": {
@@ -547,6 +637,20 @@
         "ocpp": "OCPP",
         "wallbox": "Wallbox",
         "custom": "Custom"
+      }
+    },
+    "vehicle_dashboard": {
+      "options": {
+        "vehicles": "Vehicles",
+        "charge_target_entity": "Charge target",
+        "connected_entity": "Plugged in",
+        "charging_entity": "Charging",
+        "charging_power_entity": "Charging power",
+        "range_entity": "Remaining range",
+        "time_remaining_entity": "Time to finish",
+        "yes": "Yes",
+        "no": "No",
+        "unavailable": "Unavailable"
       }
     }
   }

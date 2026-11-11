@@ -71,6 +71,7 @@ async def _walk_setup(hass: HomeAssistant, pages: list[dict[str, Any]]) -> FlowR
 
 async def _walk_options(hass: HomeAssistant, entry: MockConfigEntry, pages: list[dict[str, Any]]) -> FlowResult:
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "charger"})
     for page_input in pages:
         assert result["type"] == "form"
         result = await hass.config_entries.options.async_configure(result["flow_id"], user_input=page_input)
@@ -221,8 +222,9 @@ async def test_options_flow_prefills_stored_values(hass: HomeAssistant, config_e
     """The first options page is prefilled from the stored options."""
     config_entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "charger"})
 
-    assert result["step_id"] == "init"
+    assert result["step_id"] == "charger"
     keys = {str(marker): marker for marker in result["data_schema"].schema}
     assert keys["grid_power_entity"].description["suggested_value"] == "sensor.grid_power"
 
@@ -345,6 +347,7 @@ async def test_options_prefill_and_save_unified_source(
     """Old saved binary selections appear in the unified field and save without the obsolete key."""
     config_entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "charger"})
     schema_keys = {str(marker): marker for marker in result["data_schema"].schema}
     assert "ev_connected_entity" not in schema_keys
     marker = schema_keys["charger_status_entity"]
@@ -369,3 +372,15 @@ async def test_measured_current_requires_amperes(
     charger["charger_current_entity"] = "sensor.measured_current"
     result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=charger)
     assert result["step_id"] == "solar"
+
+
+async def test_charger_settings_preserve_vehicle_cards(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
+    """Saving the charger wizard cannot discard separately configured vehicles."""
+    config_entry.add_to_hass(hass)
+    vehicles = [{"id": "tesla", "name": "Tesla", "battery_entity": "sensor.tesla_battery"}]
+    hass.config_entries.async_update_entry(config_entry, options={**config_entry.options, "vehicles": vehicles})
+    result = await _walk_options(
+        hass, config_entry, _pages({key: value for key, value in config_entry.options.items() if key != "vehicles"})
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"]["vehicles"] == vehicles

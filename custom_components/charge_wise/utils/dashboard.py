@@ -17,6 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.util import slugify
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ def _power_scale_to_kw(hass: HomeAssistant, entity_id: str | None) -> float | No
     return factor / 1000
 
 
-def build_config(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
+def build_config(hass: HomeAssistant, entry: ConfigEntry, vehicle_labels: dict[str, str]) -> dict[str, Any]:
     """Build the dashboard from the entities this entry registered."""
     ids = _entity_ids(hass, entry)
     view = build_view(
@@ -95,6 +96,7 @@ def build_config(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
         ids,
         entry.options,
         tuple(key for _, key in _CONTROLS),
+        vehicle_labels=vehicle_labels,
         budget_in_kw=_budget_in_kw(hass, ids.get("available_solar_budget")),
         charger_power_scale_to_kw=_power_scale_to_kw(hass, entry.options.get(CONF_CHARGER_POWER_ENTITY)),
         solar_power_scale_to_kw=_power_scale_to_kw(hass, entry.options.get(CONF_SOLAR_POWER_ENTITY)),
@@ -144,7 +146,10 @@ async def async_ensure_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> boo
     dashboard = lovelace.dashboards.get(url_path)
     if dashboard is None:
         dashboard = lovelace.dashboards[url_path] = LovelaceStorage(hass, item)
-    await dashboard.async_save(build_config(hass, entry))
+    translations = await async_get_translations(hass, hass.config.language, "selector", {DOMAIN})
+    prefix = f"component.{DOMAIN}.selector.vehicle_dashboard.options."
+    vehicle_labels = {key.removeprefix(prefix): value for key, value in translations.items() if key.startswith(prefix)}
+    await dashboard.async_save(build_config(hass, entry, vehicle_labels))
 
     panel: dict[str, Any] = {
         "frontend_url_path": url_path,

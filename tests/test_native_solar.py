@@ -270,6 +270,7 @@ async def test_removing_native_control_requires_a_confirmed_safe_release(
     await _switch(hass, entry, "enabled")
     await _switch(hass, entry, "solar_enabled")
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "charger"})
     charger = {
         key: entry.options[key]
         for key in (

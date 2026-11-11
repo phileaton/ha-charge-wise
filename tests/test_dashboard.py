@@ -294,3 +294,46 @@ async def test_power_gauge_uses_native_kw_scale(
     gauge = next(card for card in cards if card.get("name") == "Actual charging power")
     assert gauge["entity"] == "sensor.charger_power"
     assert gauge["max"] == 7.68
+
+
+async def test_multiple_vehicle_cards_render_read_only_status(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Render configured readings live, hiding absent fields and preserving unavailable values."""
+    hass.states.async_set("sensor.ev_battery", "64.4", {"unit_of_measurement": "%"})
+    hass.states.async_set("number.ev_target", "80", {"unit_of_measurement": "%"})
+    hass.states.async_set("binary_sensor.ev_plugged", "on")
+    hass.states.async_set("binary_sensor.ev_charging", "off")
+    hass.states.async_set("sensor.ev_power", "4000", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.ev_range", "269", {"unit_of_measurement": "mi"})
+    hass.states.async_set("sensor.ev_time", "90", {"unit_of_measurement": "min"})
+    vehicles = [
+        {
+            "id": "rivian",
+            "name": "Rivian",
+            "battery_entity": "sensor.ev_battery",
+            "charge_target_entity": "number.ev_target",
+            "connected_entity": "binary_sensor.ev_plugged",
+            "charging_entity": "binary_sensor.ev_charging",
+            "charging_power_entity": "sensor.ev_power",
+            "range_entity": "sensor.ev_range",
+            "time_remaining_entity": "sensor.ev_time",
+        },
+        {"id": "tesla", "name": "Tesla", "battery_entity": "sensor.ev_battery"},
+    ]
+    await _setup(hass, config_entry, create=True, options={"vehicles": vehicles})
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    section = next(s for s in config["views"][0]["sections"] if s["cards"][0].get("heading") == "Vehicles")
+    rivian, tesla = section["cards"][1:]
+    assert rivian["cards"][0]["name"] == "Rivian"
+    assert rivian["cards"][0]["entity"] == "sensor.ev_battery"
+    assert tesla["cards"] == [{**rivian["cards"][0], "name": "Tesla"}]
+    content = rivian["cards"][1]["content"]
+    rendered = Template(content, hass).async_render()
+    for expected in ("80.0 %", "Plugged in:** Yes", "Charging:** No", "4000.0 W", "269.0 mi", "90.0 min"):
+        assert expected in rendered
+    hass.states.async_set("sensor.ev_power", "unavailable", {"unit_of_measurement": "W"})
+    assert "Charging power:** Unavailable" in Template(content, hass).async_render()
+    hass.states.async_set("binary_sensor.ev_charging", "unknown")
+    assert "Charging:** Unavailable" in Template(content, hass).async_render()
+    assert hass.states.get("number.ev_target").state == "80"

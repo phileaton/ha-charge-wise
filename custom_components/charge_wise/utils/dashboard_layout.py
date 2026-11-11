@@ -23,6 +23,7 @@ from custom_components.charge_wise.const import (
     DEFAULT_EV_FIRST_RELEASE_MARGIN_PERCENT,
     DEFAULT_VOLTAGE_V,
 )
+from custom_components.charge_wise.utils.dashboard_vehicles import vehicle_cards
 
 type Card = dict[str, Any]
 
@@ -466,6 +467,7 @@ def build_view(
     options: Mapping[str, Any],
     control_keys: tuple[str, ...],
     *,
+    vehicle_labels: Mapping[str, str],
     budget_in_kw: bool = True,
     solar_power_scale_to_kw: float | None = None,
     charger_power_scale_to_kw: float | None = None,
@@ -480,6 +482,8 @@ def build_view(
         _controls_section(ids, control_keys) + _budget_section(ids, options),
         _solar_section(ids, options, solar_power_scale_to_kw),
     ]
+    if vehicles := vehicle_cards(options, vehicle_labels):
+        sections.insert(1, vehicles)
     return {
         "type": "sections",
         "title": title,

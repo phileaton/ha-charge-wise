@@ -3,16 +3,18 @@
 from typing import Any
 
 from custom_components.charge_wise.config_flow_handler.paged_form import BACK_KEY, PagedForm
+from custom_components.charge_wise.config_flow_handler.vehicle_options import VehicleOptionsFlow
 from custom_components.charge_wise.const import (
     CONF_CHARGER_SWITCH_ENTITY,
     CONF_NATIVE_SOLAR_ENTITY,
     CONF_NATIVE_SOLAR_OFF_OPTION,
     CONF_NATIVE_SOLAR_OPTION,
+    CONF_VEHICLES,
 )
 from homeassistant import config_entries
 
 
-class ChargeWiseOptionsFlow(config_entries.OptionsFlow):
+class ChargeWiseOptionsFlow(VehicleOptionsFlow):
     """Update entity mappings and controller thresholds, one page at a time."""
 
     _form: PagedForm
@@ -42,12 +44,15 @@ class ChargeWiseOptionsFlow(config_entries.OptionsFlow):
                 next_page = form.next_page(page)
                 if next_page is None:
                     options = form.options()
+                    if CONF_VEHICLES in self.config_entry.options:
+                        options[CONF_VEHICLES] = self.config_entry.options[CONF_VEHICLES]
                     changed = any(
                         self.config_entry.options.get(key) != options.get(key)
                         for key in (
                             CONF_CHARGER_SWITCH_ENTITY,
                             CONF_NATIVE_SOLAR_ENTITY,
                             CONF_NATIVE_SOLAR_OPTION,
+                            CONF_VEHICLES,
                             CONF_NATIVE_SOLAR_OFF_OPTION,
                         )
                     )
@@ -62,13 +67,17 @@ class ChargeWiseOptionsFlow(config_entries.OptionsFlow):
 
         schema = form.schema(page)
         return self.async_show_form(
-            step_id="init" if page == "charger" else page,
+            step_id=page,
             data_schema=self.add_suggested_values_to_schema(schema, form.suggested(schema, user_input)),
             errors=errors,
             last_step=form.next_page(page) is None,
         )
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
+        """Choose charger configuration or display-only vehicles."""
+        return self.async_show_menu(step_id="init", menu_options=["charger", "vehicles"])
+
+    async def async_step_charger(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
         """Choose the charger entities and current limits."""
         return await self._async_page("charger", user_input)
 
