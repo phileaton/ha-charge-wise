@@ -666,6 +666,7 @@
         "no": "No",
         "unavailable": "Unavailable",
         "estimated_time_remaining": "Estimated time to target",
+        "estimated_finish": "Estimated finish",
         "hours_unit": "h",
         "minutes_unit": "min",
         "at_current_rate": "at the current rate"

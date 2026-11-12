@@ -22,6 +22,10 @@ def _time_remaining(vehicle: Mapping[str, Any], labels: Mapping[str, str]) -> st
     if not native and capacity is None:
         return None
     unavailable = f"**{labels['time_remaining_entity']}:** {labels['unavailable']}"
+    finish = (
+        f"\n\n**{labels['estimated_finish']}:** "
+        "{{ (as_timestamp(now()) + minutes * 60) | timestamp_custom('%Y-%m-%d %H:%M', true) }}"
+    )
     estimate = unavailable
     if capacity is not None and power:
         battery = vehicle["battery_entity"]
@@ -56,6 +60,7 @@ def _time_remaining(vehicle: Mapping[str, Any], labels: Mapping[str, str]) -> st
             f"**{labels['estimated_time_remaining']}:** "
             f"{{{{ minutes // 60 }}}} {labels['hours_unit']} {{{{ minutes % 60 }}}} {labels['minutes_unit']}"
             f" — {labels['at_current_rate']}"
+            f"{finish}"
             f"{{% else %}}{unavailable}{{% endif %}}"
         )
     if native:
@@ -67,6 +72,7 @@ def _time_remaining(vehicle: Mapping[str, Any], labels: Mapping[str, str]) -> st
             "native * 60 if native_unit == 'h' else native) | round(0, 'ceil') | int %}"
             f"**{labels['time_remaining_entity']}:** "
             f"{{{{ minutes // 60 }}}} {labels['hours_unit']} {{{{ minutes % 60 }}}} {labels['minutes_unit']}"
+            f"{finish}"
             f"{{% else %}}{estimate}{{% endif %}}"
         )
     return estimate

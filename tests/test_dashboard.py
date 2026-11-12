@@ -535,3 +535,60 @@ async def test_vehicle_charge_time_estimate(
     assert rendered.count("time to target") + rendered.count("Time to finish") == 1
     if "Estimated time" in expected:
         assert "at the current rate" in rendered
+
+
+@pytest.mark.freeze_time("2026-11-13 07:30:00+00:00")
+@pytest.mark.parametrize(
+    ("duration", "unit", "power", "expected"),
+    [
+        ("90", "min", "10", "2026-11-13 01:00"),
+        ("5400", "s", "10", "2026-11-13 01:00"),
+        ("1.5", "h", "10", "2026-11-13 01:00"),
+        ("0", "min", "10", "2026-11-12 23:30"),
+        ("1500", "min", "10", "2026-11-14 00:30"),
+        ("unavailable", "min", "10", "2026-11-13 03:30"),
+        ("unavailable", "min", "0", None),
+    ],
+)
+async def test_vehicle_finish_clock_time(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    duration: str,
+    unit: str,
+    power: str,
+    expected: str | None,
+) -> None:
+    """Show finish dates in local time for native durations and calculated fallbacks."""
+    await hass.config.async_set_time_zone("America/Los_Angeles")
+    hass.states.async_set("sensor.ev_battery", "40", {"unit_of_measurement": "%"})
+    hass.states.async_set("number.ev_target", "80", {"unit_of_measurement": "%"})
+    hass.states.async_set("sensor.ev_power", power, {"unit_of_measurement": "kW"})
+    hass.states.async_set("sensor.ev_time", duration, {"unit_of_measurement": unit})
+    await _setup(
+        hass,
+        config_entry,
+        create=True,
+        options={
+            "vehicles": [
+                {
+                    "id": "ev",
+                    "name": "EV",
+                    "battery_entity": "sensor.ev_battery",
+                    "charge_target_entity": "number.ev_target",
+                    "charging_power_entity": "sensor.ev_power",
+                    "time_remaining_entity": "sensor.ev_time",
+                    "battery_capacity_kwh": 100,
+                }
+            ]
+        },
+    )
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    section = next(s for s in config["views"][0]["sections"] if s["cards"][0].get("heading") == "Vehicles")
+    template = Template(section["cards"][1]["cards"][1]["content"], hass)
+    rendered = template.async_render()
+    if expected is None:
+        assert "Estimated finish" not in rendered
+    else:
+        assert f"Estimated finish:** {expected}" in rendered
+        assert rendered.count("Estimated finish") == 1
+        assert template.async_render_to_info().has_time
