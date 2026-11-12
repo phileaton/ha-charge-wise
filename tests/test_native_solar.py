@@ -2,10 +2,12 @@
 
 from datetime import timedelta
 
+from freezegun.api import FrozenDateTimeFactory
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_capture_events,
+    async_fire_time_changed,
     setup_test_component_platform,
 )
 
@@ -13,7 +15,7 @@ from custom_components.charge_wise.const import DOMAIN
 from homeassistant.components.number import NumberEntity
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
@@ -317,3 +319,98 @@ async def test_full_battery_handoff_releases_below_configured_threshold(
     hass.states.async_set("sensor.battery_level", "96", {"unit_of_measurement": "%"})
     await hass.async_block_till_done()
     assert hass.states.get("select.charger_solar").state == "Off"
+
+
+@pytest.mark.parametrize("confirms_limit", [True, False])
+async def test_native_handoff_bounds_current_confirmation(
+    hass: HomeAssistant,
+    native_entry: tuple[MockConfigEntry, ChargerSolar],
+    freezer: FrozenDateTimeFactory,
+    confirms_limit: bool,
+) -> None:
+    """A slow or ignored current-limit command must not be spammed during native handoff."""
+    entry, solar = native_entry
+    commands: list[float] = []
+
+    async def delay_current(call: ServiceCall) -> None:
+        commands.append(call.data["value"])
+
+    hass.services.async_register("number", "set_value", delay_current)
+    await _switch(hass, entry, "enabled")
+    await _switch(hass, entry, "solar_enabled")
+    for power in (-1000, -1100, -1200):
+        hass.states.async_set("sensor.grid_power", power, {"unit_of_measurement": "W"})
+        await hass.async_block_till_done()
+    assert commands == [32]
+    assert solar.commands == []
+    assert hass.states.get("switch.charger_enable").state == "off"
+    freezer.tick(10)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    if confirms_limit:
+        state = hass.states.get("number.current_limit")
+        hass.states.async_set("number.current_limit", "32", dict(state.attributes))
+        await hass.async_block_till_done()
+    freezer.tick(21)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    status = _entity_id(hass, entry, "sensor", "controller_status")
+    assert hass.states.get(status).state == ("waiting" if confirms_limit else "error")
+    assert solar.commands == (["Full solar"] if confirms_limit else [])
+    assert commands == [32]
+    assert hass.states.get("switch.charger_enable").state == ("on" if confirms_limit else "off")
+
+
+async def test_native_current_limit_changes_do_not_extend_the_response_deadline(
+    hass: HomeAssistant,
+    native_entry: tuple[MockConfigEntry, ChargerSolar],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A changed hardware cap replaces the target without keeping an ignored handoff alive."""
+    entry, solar = native_entry
+    commands: list[float] = []
+
+    async def delay_current(call: ServiceCall) -> None:
+        commands.append(call.data["value"])
+
+    hass.services.async_register("number", "set_value", delay_current)
+    await _switch(hass, entry, "enabled")
+    await _switch(hass, entry, "solar_enabled")
+    freezer.tick(25)
+    hass.states.async_set("number.hardware_maximum", "24", {"unit_of_measurement": "A"})
+    await hass.async_block_till_done()
+    assert commands == [32, 24]
+    freezer.tick(6)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(_entity_id(hass, entry, "sensor", "controller_status")).state == "error"
+    assert commands == [32, 24]
+    assert solar.commands == []
+    assert hass.states.get("switch.charger_enable").state == "off"
+
+
+async def test_disabling_native_handoff_cancels_its_current_confirmation(
+    hass: HomeAssistant,
+    native_entry: tuple[MockConfigEntry, ChargerSolar],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A deliberate disable and re-enable starts a fresh handoff confirmation window."""
+    entry, solar = native_entry
+    commands: list[float] = []
+
+    async def delay_current(call: ServiceCall) -> None:
+        commands.append(call.data["value"])
+
+    hass.services.async_register("number", "set_value", delay_current)
+    await _switch(hass, entry, "enabled")
+    await _switch(hass, entry, "solar_enabled")
+    freezer.tick(20)
+    await _switch(hass, entry, "enabled", on=False)
+    freezer.tick(15)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(_entity_id(hass, entry, "sensor", "controller_status")).state == "off"
+    await _switch(hass, entry, "enabled")
+    assert hass.states.get(_entity_id(hass, entry, "sensor", "controller_status")).state == "waiting"
+    assert commands == [32, 32]
+    assert solar.commands == []

@@ -159,6 +159,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self.forecast_accuracy = ForecastAccuracy()
         self._last_switch_command: tuple[bool, datetime] | None = None
         self._last_native_command: tuple[str, datetime] | None = None
+        self._last_native_current_command: tuple[float, datetime] | None = None
         self._native_full_battery = False
         self._native_battery_store: Store[dict[str, bool]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.native_solar")
         self._startup = ChargeWiseStartupMonitor()
@@ -590,6 +591,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             )
         except HomeAssistantError:
             self._startup.fail()
+            self._last_native_current_command = None
             LOGGER.exception("Failed to apply charger control decision")
             await self._async_fail_safe()
             self.async_set_updated_data(
@@ -1033,6 +1035,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
 
     async def _async_set_native_solar(self, enabled: bool) -> bool:
         """Stop the charger while changing ownership, then wait for the mode to be confirmed."""
+        if not enabled:
+            self._last_native_current_command = None
         entity_id = self.options[CONF_NATIVE_SOLAR_ENTITY]
         state = self.hass.states.get(entity_id)
         option = self.options[CONF_NATIVE_SOLAR_OPTION if enabled else CONF_NATIVE_SOLAR_OFF_OPTION]
@@ -1052,19 +1056,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         if state.state == option:
             return True
 
-        if enabled:
-            current_entity = self.options[CONF_CURRENT_TARGET_ENTITY]
-            current = self._number_value(current_entity)
-            if current is None:
-                raise HomeAssistantError(f"Session current limit {current_entity} is unavailable")
-            maximum = self.maximum_current_a
-            if not isclose(current, maximum, abs_tol=0.01):
-                await self.hass.services.async_call(
-                    "number", "set_value", {ATTR_ENTITY_ID: current_entity, "value": maximum}, blocking=True
-                )
-                current = self._number_value(current_entity)
-                if current is None or not isclose(current, maximum, abs_tol=0.01):
-                    return False
+        if enabled and not await self._async_prepare_native_current():
+            return False
 
         if not await self._async_stop_for_native_change():
             return False
@@ -1079,6 +1072,40 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self._last_native_command = None
             return True
         return False
+
+    async def _async_prepare_native_current(self) -> bool:
+        """Confirm the native current limit once per target within a fixed response window."""
+        entity_id = self.options[CONF_CURRENT_TARGET_ENTITY]
+        current = self._number_value(entity_id)
+        maximum = self.maximum_current_a
+        now = dt_util.utcnow()
+        command = self._last_native_current_command
+        if current is None or (
+            command is not None
+            and now - command[1] >= COMMAND_CONFIRMATION
+            and not isclose(current, maximum, abs_tol=0.01)
+        ):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="native_current_confirmation_failed",
+                translation_placeholders={"entity_id": entity_id},
+            )
+        if not isclose(current, maximum, abs_tol=0.01):
+            if command is None or command[0] != maximum:
+                self._last_native_current_command = (maximum, command[1] if command else now)
+                await self.hass.services.async_call(
+                    "number",
+                    "set_value",
+                    {ATTR_ENTITY_ID: entity_id, "value": maximum},
+                    blocking=True,
+                )
+            current = self._number_value(entity_id)
+            if current is None or not isclose(current, maximum, abs_tol=0.01):
+                if self._entity_is_on(self.options[CONF_CHARGER_SWITCH_ENTITY]):
+                    await self._async_fail_safe()
+                return False
+        self._last_native_current_command = None
+        return True
 
     async def _async_stop_for_native_change(self) -> bool:
         """Stop charging and confirm it is stopped before changing charger control."""
@@ -1131,6 +1158,9 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 self._ev_first_until,
                 self._under_drawing_detector.next_update_at,
                 self._startup.next_update_at,
+                self._last_native_current_command[1] + COMMAND_CONFIRMATION
+                if self._last_native_current_command is not None
+                else None,
             )
             if value is not None
         ]

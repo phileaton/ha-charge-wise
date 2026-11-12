@@ -225,6 +225,8 @@ protection binary sensor is created only when a battery-power entity is configur
   Missing or unconfirmed current limits fail after 30 seconds. Once the current limit is confirmed, the start
   command gets its own 30-second response window. An unconfirmed
   current change while charging triggers a best-effort stop while Charge Wise waits for acknowledgement.
+- Native solar handoff also requires the session current limit to confirm its requested maximum within 30 seconds.
+  Identical pending requests are not repeated. A failed confirmation stops the handoff and reports Error.
 - If the charger reports enabled but produces no measured charging activity for five minutes, Charge Wise reports Error while
   keeping the charger enabled and its current limit in place. It does not repeat start commands or reboot the charger.
   The error clears automatically when measured charging begins. Explicit paused/finished session statuses and native
