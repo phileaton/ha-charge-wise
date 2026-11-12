@@ -227,6 +227,9 @@ protection binary sensor is created only when a battery-power entity is configur
   current change while charging triggers a best-effort stop while Charge Wise waits for acknowledgement.
 - Native solar handoff also requires the session current limit to confirm its requested maximum within 30 seconds.
   Identical pending requests are not repeated. A failed confirmation stops the handoff and reports Error.
+- Before changing native solar mode, Charge Wise waits up to 30 seconds for the charger to report stopped.
+  An ignored stop reports Error and leaves native mode unchanged. Stop commands remain best effort; an error does
+  not mean the physical charger has stopped. Check the charger before retrying or changing its configuration.
 - If the charger reports enabled but produces no measured charging activity for five minutes, Charge Wise reports Error while
   keeping the charger enabled and its current limit in place. It does not repeat start commands or reboot the charger.
   The error clears automatically when measured charging begins. Explicit paused/finished session statuses and native

@@ -479,6 +479,9 @@
     },
     "native_current_confirmation_failed": {
       "message": "Charger current limit {entity_id} is unavailable or did not confirm its command."
+    },
+    "native_stop_confirmation_failed": {
+      "message": "Charger {entity_id} did not confirm stopping. Native solar control was not changed."
     }
   },
   "entity": {

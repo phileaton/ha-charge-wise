@@ -160,6 +160,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self._last_switch_command: tuple[bool, datetime] | None = None
         self._last_native_command: tuple[str, datetime] | None = None
         self._last_native_current_command: tuple[float, datetime] | None = None
+        self._native_stop_deadline: datetime | None = None
         self._native_full_battery = False
         self._native_battery_store: Store[dict[str, bool]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.native_solar")
         self._startup = ChargeWiseStartupMonitor()
@@ -394,6 +395,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self._startup.reset()
             self._last_current_command = None
             self._last_switch_command = None
+            self._native_stop_deadline = None
         self.switches[key] = value
         if not restoring and key == "solar_enabled" and not value:
             self._reset_ev_first()
@@ -609,7 +611,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             self._schedule_timer(decision)
             return
 
-        if not applied:
+        if not applied and decision.status is not ControllerStatus.ERROR:
             decision = replace(
                 decision,
                 status=ControllerStatus.WAITING,
@@ -1054,6 +1056,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 await self._async_stop_for_native_change()
                 return False
         if state.state == option:
+            self._native_stop_deadline = None
             return True
 
         if enabled and not await self._async_prepare_native_current():
@@ -1108,18 +1111,33 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         return True
 
     async def _async_stop_for_native_change(self) -> bool:
-        """Stop charging and confirm it is stopped before changing charger control."""
+        """Require stop confirmation before changing control, and report ignored stops."""
         switch_entity = self.options[CONF_CHARGER_SWITCH_ENTITY]
         switch = self.hass.states.get(switch_entity)
-        if switch is None or switch.state != STATE_OFF:
-            if self._switch_command_due(False):
-                await self.hass.services.async_call(
-                    "switch", "turn_off", {ATTR_ENTITY_ID: switch_entity}, blocking=True
+        if switch is not None and switch.state == STATE_OFF:
+            self._native_stop_deadline = None
+            return True
+        now = dt_util.utcnow()
+        if not self._startup.failed:
+            self._native_stop_deadline = self._native_stop_deadline or now + COMMAND_CONFIRMATION
+            if now >= self._native_stop_deadline:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="native_stop_confirmation_failed",
+                    translation_placeholders={"entity_id": switch_entity},
                 )
-            switch = self.hass.states.get(switch_entity)
-            if switch is None or switch.state != STATE_OFF:
-                return False
-        return True
+        if self._switch_command_due(False):
+            await self.hass.services.async_call(
+                "switch",
+                "turn_off",
+                {ATTR_ENTITY_ID: switch_entity},
+                blocking=True,
+            )
+        switch = self.hass.states.get(switch_entity)
+        if switch is not None and switch.state == STATE_OFF:
+            self._native_stop_deadline = None
+            return True
+        return False
 
     def _switch_command_due(self, turn_on: bool) -> bool:
         """Return False while an identical command is still waiting for the charger to report back."""
@@ -1158,6 +1176,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 self._ev_first_until,
                 self._under_drawing_detector.next_update_at,
                 self._startup.next_update_at,
+                self._native_stop_deadline if not self._startup.failed else None,
                 self._last_native_current_command[1] + COMMAND_CONFIRMATION
                 if self._last_native_current_command is not None
                 else None,

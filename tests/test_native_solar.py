@@ -414,3 +414,51 @@ async def test_disabling_native_handoff_cancels_its_current_confirmation(
     assert hass.states.get(_entity_id(hass, entry, "sensor", "controller_status")).state == "waiting"
     assert commands == [32, 32]
     assert solar.commands == []
+
+
+@pytest.mark.parametrize("confirms_stop", [True, False])
+async def test_native_handoff_requires_a_bounded_stop_confirmation(
+    hass: HomeAssistant,
+    native_entry: tuple[MockConfigEntry, ChargerSolar],
+    freezer: FrozenDateTimeFactory,
+    confirms_stop: bool,
+) -> None:
+    """An ignored stop must report an error without changing ownership of a running charger."""
+    entry, solar = native_entry
+    await _switch(hass, entry, "enabled")
+    await _switch(hass, entry, "solar_enabled")
+    stops: list[str] = []
+
+    async def delay_stop(call: ServiceCall) -> None:
+        stops.append(call.data["entity_id"])
+
+    hass.services.async_register("switch", "turn_off", delay_stop)
+    await _switch(hass, entry, "manual_override")
+    for power in (-1000, -1100, -1200):
+        hass.states.async_set("sensor.grid_power", power, {"unit_of_measurement": "W"})
+        await hass.async_block_till_done()
+    assert stops == ["switch.charger_enable"]
+    assert solar.commands == ["Full solar"]
+    freezer.tick(10)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    if confirms_stop:
+        hass.states.async_set("switch.charger_enable", "off")
+        await hass.async_block_till_done()
+    freezer.tick(21)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    status = _entity_id(hass, entry, "sensor", "controller_status")
+    assert hass.states.get(status).state == ("charging" if confirms_stop else "error")
+    assert solar.commands == (["Full solar", "Off"] if confirms_stop else ["Full solar"])
+    assert len(stops) == (1 if confirms_stop else 2)
+    hass.states.async_set("sensor.grid_power", "-1300", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert hass.states.get(status).state == ("charging" if confirms_stop else "error")
+    assert len(stops) == (1 if confirms_stop else 2)
+    if not confirms_stop:
+        hass.states.async_set("switch.charger_enable", "off")
+        await hass.async_block_till_done()
+    assert solar.commands == ["Full solar", "Off"]
+    assert hass.states.get(status).state == ("charging" if confirms_stop else "error")
+    assert hass.states.get("switch.charger_enable").state == ("on" if confirms_stop else "off")
