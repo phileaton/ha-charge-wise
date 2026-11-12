@@ -1005,6 +1005,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                     or now - command[1] >= COMMAND_CONFIRMATION
                 ):
                     self._last_current_command = (decision.requested_current_a, now)
+                    self._startup.current_requested(now)
                     await self.hass.services.async_call(
                         "number",
                         "set_value",
@@ -1020,6 +1021,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 self._last_current_command = None
 
         if (switch_state is None or switch_state.state != STATE_ON) and self._switch_command_due(True):
+            if decision.reason is not ChargeWiseReason.NATIVE_SOLAR:
+                self._startup.start_requested(dt_util.utcnow())
             await self.hass.services.async_call(
                 "switch",
                 "turn_on",

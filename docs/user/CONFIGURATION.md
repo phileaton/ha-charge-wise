@@ -222,9 +222,10 @@ protection binary sensor is created only when a battery-power entity is configur
 - A failed target or switch command is reported as an error and triggers a best-effort stop command.
 - Charge Wise waits for the requested current limit before enabling a normal charger. An OCPP session limit may
   become available only after starting its transaction; that startup is allowed a 30-second confirmation window.
-  Missing or unconfirmed current limits and unconfirmed start commands fail after 30 seconds. An unconfirmed
+  Missing or unconfirmed current limits fail after 30 seconds. Once the current limit is confirmed, the start
+  command gets its own 30-second response window. An unconfirmed
   current change while charging triggers a best-effort stop while Charge Wise waits for acknowledgement.
-- If requested charging produces no measured charging activity for five minutes, Charge Wise reports Error while
+- If the charger reports enabled but produces no measured charging activity for five minutes, Charge Wise reports Error while
   keeping the charger enabled and its current limit in place. It does not repeat start commands or reboot the charger.
   The error clears automatically when measured charging begins. Explicit paused/finished session statuses and native
   solar mode are exempt from this power check. Normal safety checks and charging windows still apply.

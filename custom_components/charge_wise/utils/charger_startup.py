@@ -31,6 +31,14 @@ class ChargeWiseStartupMonitor:
         self.failed = True
         self._clear_deadlines()
 
+    def current_requested(self, now: datetime) -> None:
+        """Begin the current response window when its limit command is sent."""
+        self.current_deadline = self.current_deadline or now + COMMAND_CONFIRMATION
+
+    def start_requested(self, now: datetime) -> None:
+        """Begin the switch response window when its start command is sent."""
+        self.switch_deadline = self.switch_deadline or now + COMMAND_CONFIRMATION
+
     def confirm_commands(self, *, target_a: float, observed_a: float | None, switch_on: bool) -> None:
         """Clear deadlines immediately when a service call publishes its acknowledgement."""
         if observed_a is not None and isclose(observed_a, target_a, abs_tol=0.01):
@@ -71,10 +79,14 @@ class ChargeWiseStartupMonitor:
             self._clear_deadlines()
             return False
         current_confirmed = observed_a is not None and isclose(observed_a, target_a, abs_tol=0.01)
-        self.current_deadline = None if current_confirmed else self.current_deadline or now + COMMAND_CONFIRMATION
-        self.switch_deadline = None if switch_on else self.switch_deadline or now + COMMAND_CONFIRMATION
+        if current_confirmed:
+            self.current_deadline = None
+        elif observed_a is None:
+            self.current_deadline = self.current_deadline or now + COMMAND_CONFIRMATION
+        if switch_on:
+            self.switch_deadline = None
         no_power_expected = session in (ChargerSessionStatus.PAUSED, ChargerSessionStatus.FINISHED)
-        if charging is True or no_power_expected:
+        if not switch_on or charging is True or no_power_expected:
             self.not_drawing = False
             self.charging_deadline = None
         elif not self.not_drawing:

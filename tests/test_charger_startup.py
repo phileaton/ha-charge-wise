@@ -70,6 +70,11 @@ class ChargerSwitch(SwitchEntity):
             self._attr_is_on = True
             self.async_write_ha_state()
 
+    def confirm_start(self) -> None:
+        """Publish a delayed start acknowledgement."""
+        self._attr_is_on = True
+        self.async_write_ha_state()
+
     async def async_turn_off(self, **kwargs: object) -> None:
         """Confirm the safety stop."""
         self.stops += 1
@@ -317,3 +322,32 @@ async def test_no_power_error_keeps_charging_enabled_and_recovers_automatically(
     await hass.async_block_till_done()
     assert hass.states.get(status).state == "charging"
     assert hass.states.get("switch.charger_enable").state == "on"
+
+
+@pytest.mark.parametrize("confirms_start", [True, False])
+async def test_start_confirmation_grace_begins_after_current_confirmation(
+    hass: HomeAssistant,
+    startup_entry: tuple[MockConfigEntry, CurrentTarget, ChargerSwitch],
+    freezer: FrozenDateTimeFactory,
+    confirms_start: bool,
+) -> None:
+    """A delayed current acknowledgement must not consume the switch's response window."""
+    entry, target, charger = startup_entry
+    target.delay = True
+    charger.delay = True
+    await _start(hass, entry)
+    assert charger.starts == 0
+    await _advance(hass, freezer, 25)
+    target.confirm(32)
+    await hass.async_block_till_done()
+    assert charger.starts == 1
+    await _advance(hass, freezer, 10)
+    status = _entity(hass, entry, "sensor", "controller_status")
+    assert hass.states.get(status).state != "error"
+    if confirms_start:
+        charger.confirm_start()
+        hass.states.async_set("sensor.charger_power", "2000", {"unit_of_measurement": "W"})
+        await hass.async_block_till_done()
+    await _advance(hass, freezer, 21)
+    assert hass.states.get(status).state == ("charging" if confirms_start else "error")
+    assert charger.starts == 1
