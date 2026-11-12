@@ -41,6 +41,7 @@ class ChargeWiseSnapshot:
     vehicle_connected: bool | None = None
     vehicle_charging: bool | None = None
     ev_under_drawing: bool | None = None
+    charging_not_detected: bool = False
     charger_session: ChargerSessionStatus | None = None
     charger_status_profile: str = "unknown"
     charger_raw_status: str | None = None

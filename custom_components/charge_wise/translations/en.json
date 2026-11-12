@@ -611,6 +611,9 @@
       },
       "ev_under_drawing": {
         "name": "EV drawing less than offered"
+      },
+      "charging_not_detected": {
+        "name": "Charging not detected"
       }
     },
     "switch": {

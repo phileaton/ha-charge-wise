@@ -254,6 +254,10 @@ Each entry creates:
 - **Vehicle connected** and **Vehicle charging** binary sensors, and a **Charger session** sensor. These show observations even when control is off; missing evidence appears as unknown.
 - **Next off-peak window** timestamp sensor.
 - **Off-peak active** and **EV-first active** binary sensors.
+- **Charging not detected** diagnostic problem sensor. It turns on after five minutes of requested charging with
+  no measured charging activity, while keeping charging enabled. Use it for notifications independently of general
+  control errors. It clears when charging begins, charging is no longer requested, or the charger explicitly reports
+  paused/finished. Native solar mode is exempt. Command-confirmation failures use the controller Error status instead.
 - **Battery protection active** binary sensor when battery power is configured.
 
 Entity IDs are based on the charger name chosen during setup. Use the entity picker in automations and dashboards

@@ -696,6 +696,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             vehicle_connected=self.charger_observation.connected,
             vehicle_charging=self.charger_observation.charging,
             ev_under_drawing=under_drawing,
+            charging_not_detected=self._startup.not_drawing and not self._startup.failed,
             charger_session=self.charger_observation.session,
             charger_status_profile=self.charger_observation.profile,
             charger_raw_status=self.charger_observation.raw_status,

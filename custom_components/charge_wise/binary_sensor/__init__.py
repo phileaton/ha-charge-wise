@@ -6,6 +6,10 @@ from custom_components.charge_wise.binary_sensor.battery_protection import (
     ENTITY_DESCRIPTION,
     ChargeWiseBatteryProtectionBinarySensor,
 )
+from custom_components.charge_wise.binary_sensor.charging_not_detected import (
+    ENTITY_DESCRIPTION as NOT_DETECTED_DESCRIPTION,
+    ChargeWiseChargingNotDetectedBinarySensor,
+)
 from custom_components.charge_wise.binary_sensor.ev_first_active import (
     ENTITY_DESCRIPTION as EV_FIRST_DESCRIPTION,
     ChargeWiseEvFirstActiveBinarySensor,
@@ -42,12 +46,13 @@ async def async_setup_entry(
     entry: ChargeWiseConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create the battery-protection entity when its source is configured."""
+    """Create controller observations and configured protection diagnostics."""
     coordinator = entry.runtime_data.coordinator
     if coordinator.options.get(CONF_CHARGER_CURRENT_ENTITY):
         async_add_entities([ChargeWiseEvUnderDrawingBinarySensor(coordinator, UNDER_DRAWING_DESCRIPTION)])
     async_add_entities(
         [
+            ChargeWiseChargingNotDetectedBinarySensor(coordinator, NOT_DETECTED_DESCRIPTION),
             ChargeWiseVehicleConnectedBinarySensor(coordinator, CONNECTED_DESCRIPTION),
             ChargeWiseVehicleChargingBinarySensor(coordinator, CHARGING_DESCRIPTION),
             ChargeWiseOffpeakActiveBinarySensor(coordinator, OFFPEAK_DESCRIPTION),

@@ -226,6 +226,8 @@ async def test_start_requires_power_except_for_explicit_paused_or_finished_sessi
     await _advance(hass, freezer, 301)
     assert hass.states.get(_entity(hass, entry, "sensor", "controller_status")).state == expected
     assert hass.states.get("switch.charger_enable").state == "on"
+    warning = _entity(hass, entry, "binary_sensor", "charging_not_detected")
+    assert hass.states.get(warning).state == ("on" if expected == "error" else "off")
 
 
 async def test_confirmed_current_adjustments_do_not_accumulate_a_timeout(
@@ -307,9 +309,12 @@ async def test_no_power_error_keeps_charging_enabled_and_recovers_automatically(
     """Report a failed start without stopping, repeating commands, or requiring a manual reset."""
     entry, target, charger = startup_entry
     await _start(hass, entry)
+    warning = _entity(hass, entry, "binary_sensor", "charging_not_detected")
+    assert hass.states.get(warning).state == "off"
     await _advance(hass, freezer, 301)
     status = _entity(hass, entry, "sensor", "controller_status")
     assert hass.states.get(status).state == "error"
+    assert hass.states.get(warning).state == "on"
     assert hass.states.get("switch.charger_enable").state == "on"
     assert hass.states.get(_entity(hass, entry, "switch", "enabled")).state == "on"
     await _advance(hass, freezer, 600)
@@ -321,6 +326,7 @@ async def test_no_power_error_keeps_charging_enabled_and_recovers_automatically(
     hass.states.async_set("sensor.charger_power", "2000", {"unit_of_measurement": "W"})
     await hass.async_block_till_done()
     assert hass.states.get(status).state == "charging"
+    assert hass.states.get(warning).state == "off"
     assert hass.states.get("switch.charger_enable").state == "on"
 
 
@@ -351,3 +357,32 @@ async def test_start_confirmation_grace_begins_after_current_confirmation(
     await _advance(hass, freezer, 21)
     assert hass.states.get(status).state == ("charging" if confirms_start else "error")
     assert charger.starts == 1
+
+
+@pytest.mark.parametrize("clear_event", ["disabled", "disconnected", "paused", "finished"])
+async def test_no_power_diagnostic_clears_when_charging_is_no_longer_expected(
+    hass: HomeAssistant,
+    startup_entry: tuple[MockConfigEntry, CurrentTarget, ChargerSwitch],
+    freezer: FrozenDateTimeFactory,
+    clear_event: str,
+) -> None:
+    """A previously raised warning must not remain active after an intentional stop or pause."""
+    entry, _, _ = startup_entry
+    await _start(hass, entry)
+    await _advance(hass, freezer, 301)
+    warning = _entity(hass, entry, "binary_sensor", "charging_not_detected")
+    assert hass.states.get(warning).state == "on"
+    if clear_event == "disabled":
+        await hass.services.async_call(
+            "switch",
+            "turn_off",
+            {"entity_id": _entity(hass, entry, "switch", "enabled")},
+            blocking=True,
+        )
+    else:
+        statuses = {"disconnected": "Available", "paused": "SuspendedEV", "finished": "Finishing"}
+        hass.states.async_set("sensor.charger_status", statuses[clear_event])
+    await hass.async_block_till_done()
+    assert hass.states.get(warning).state == "off"
+    await _advance(hass, freezer, 301)
+    assert hass.states.get(warning).state == "off"
