@@ -24,7 +24,14 @@ def _time_remaining(vehicle: Mapping[str, Any], labels: Mapping[str, str]) -> st
     unavailable = f"**{labels['time_remaining_entity']}:** {labels['unavailable']}"
     finish = (
         f"\n\n**{labels['estimated_finish']}:** "
-        "{{ (as_timestamp(now()) + minutes * 60) | timestamp_custom('%Y-%m-%d %H:%M', true) }}"
+        "{% set finish = (as_timestamp(now()) + minutes * 60) | as_datetime | as_local %}"
+        "{% if minutes >= 1440 %}"
+        "{% if (finish.date() - now().date()).days == 1 %}"
+        f"{labels['tomorrow_at']} "
+        "{% else %}"
+        f"{{{{ finish.strftime('%b %-d, %Y') }}}} {labels['finish_at']} "
+        "{% endif %}{% endif %}"
+        "{{ finish.strftime('%-I:%M %p') | lower }}"
     )
     estimate = unavailable
     if capacity is not None and power:

@@ -541,12 +541,17 @@ async def test_vehicle_charge_time_estimate(
 @pytest.mark.parametrize(
     ("duration", "unit", "power", "expected"),
     [
-        ("90", "min", "10", "2026-11-13 01:00"),
-        ("5400", "s", "10", "2026-11-13 01:00"),
-        ("1.5", "h", "10", "2026-11-13 01:00"),
-        ("0", "min", "10", "2026-11-12 23:30"),
-        ("1500", "min", "10", "2026-11-14 00:30"),
-        ("unavailable", "min", "10", "2026-11-13 03:30"),
+        ("90", "min", "10", "1:00 am"),
+        ("5400", "s", "10", "1:00 am"),
+        ("1.5", "h", "10", "1:00 am"),
+        ("0", "min", "10", "11:30 pm"),
+        ("1439", "min", "10", "11:29 pm"),
+        ("1440", "min", "10", "Tomorrow at 11:30 pm"),
+        ("1441", "min", "10", "Tomorrow at 11:31 pm"),
+        ("1500", "min", "10", "Nov 14, 2026 at 12:30 am"),
+        ("750", "min", "10", "12:00 pm"),
+        ("30", "min", "10", "12:00 am"),
+        ("unavailable", "min", "10", "3:30 am"),
         ("unavailable", "min", "0", None),
     ],
 )
@@ -558,7 +563,7 @@ async def test_vehicle_finish_clock_time(
     power: str,
     expected: str | None,
 ) -> None:
-    """Show finish dates in local time for native durations and calculated fallbacks."""
+    """Use friendly local times, adding day context only from 24 hours onward."""
     await hass.config.async_set_time_zone("America/Los_Angeles")
     hass.states.async_set("sensor.ev_battery", "40", {"unit_of_measurement": "%"})
     hass.states.async_set("number.ev_target", "80", {"unit_of_measurement": "%"})

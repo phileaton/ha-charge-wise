@@ -670,6 +670,8 @@
         "unavailable": "Unavailable",
         "estimated_time_remaining": "Estimated time to target",
         "estimated_finish": "Estimated finish",
+        "tomorrow_at": "Tomorrow at",
+        "finish_at": "at",
         "hours_unit": "h",
         "minutes_unit": "min",
         "at_current_rate": "at the current rate"
