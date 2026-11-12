@@ -367,7 +367,7 @@
         "data_description": {
           "name": "Name shown on this vehicle’s dashboard card.",
           "battery_entity": "Required vehicle battery sensor reporting a percentage.",
-          "charge_target_entity": "Optional sensor or number reporting the target percentage. Displayed read-only.",
+          "charge_target_entity": "Optional sensor or number reporting the target percentage. Select a number to change the target from the dashboard; sensors are read-only.",
           "connected_entity": "Optional binary sensor: on means the vehicle is plugged in.",
           "charging_entity": "Optional binary sensor: on means the vehicle is charging.",
           "charging_power_entity": "Optional power sensor reporting W or kW.",
@@ -393,7 +393,7 @@
         "data_description": {
           "name": "Name shown on this vehicle’s dashboard card.",
           "battery_entity": "Required vehicle battery sensor reporting a percentage.",
-          "charge_target_entity": "Optional sensor or number reporting the target percentage. Displayed read-only.",
+          "charge_target_entity": "Optional sensor or number reporting the target percentage. Select a number to change the target from the dashboard; sensors are read-only.",
           "connected_entity": "Optional binary sensor: on means the vehicle is plugged in.",
           "charging_entity": "Optional binary sensor: on means the vehicle is charging.",
           "charging_power_entity": "Optional power sensor reporting W or kW.",

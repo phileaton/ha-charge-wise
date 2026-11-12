@@ -70,7 +70,7 @@ def _time_remaining(vehicle: Mapping[str, Any], labels: Mapping[str, str]) -> st
 
 
 def vehicle_cards(options: Mapping[str, Any], labels: Mapping[str, str]) -> list[dict[str, Any]]:
-    """Build one battery gauge and read-only status card per configured vehicle."""
+    """Build battery gauges, status readings and supported charge-target controls."""
     cards: list[dict[str, Any]] = []
     unavailable = labels["unavailable"]
     yes = labels["yes"]
@@ -110,6 +110,15 @@ def vehicle_cards(options: Mapping[str, Any], labels: Mapping[str, str]) -> list
         ]
         if readings:
             contents.append({"type": "markdown", "content": "\n\n".join(readings)})
+        if (target := vehicle.get("charge_target_entity", "")).startswith("number."):
+            contents.append(
+                {
+                    "type": "tile",
+                    "entity": target,
+                    "name": labels["charge_target_entity"],
+                    "features": [{"type": "numeric-input", "style": "buttons"}],
+                }
+            )
         cards.append({"type": "vertical-stack", "cards": contents, "grid_options": {"columns": 12}})
     if cards:
         cards.insert(

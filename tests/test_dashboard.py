@@ -297,7 +297,7 @@ async def test_power_gauge_uses_native_kw_scale(
     assert gauge["max"] == 7.68
 
 
-async def test_multiple_vehicle_cards_render_read_only_status(
+async def test_multiple_vehicle_cards_render_status_and_target_control(
     hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
     """Render configured readings live, hiding absent fields and preserving unavailable values."""
@@ -329,6 +329,12 @@ async def test_multiple_vehicle_cards_render_read_only_status(
     assert rivian["cards"][0]["name"] == "Rivian"
     assert rivian["cards"][0]["entity"] == "sensor.ev_battery"
     assert tesla["cards"] == [{**rivian["cards"][0], "name": "Tesla"}]
+    assert rivian["cards"][2] == {
+        "type": "tile",
+        "entity": "number.ev_target",
+        "name": "Charge target",
+        "features": [{"type": "numeric-input", "style": "buttons"}],
+    }
     content = rivian["cards"][1]["content"]
     rendered = Template(content, hass).async_render()
     for expected in ("80.0 %", "Plugged in:** Yes", "Charging:** No", "4000.0 W", "269.0 mi", "90.0 min"):
@@ -338,6 +344,36 @@ async def test_multiple_vehicle_cards_render_read_only_status(
     hass.states.async_set("binary_sensor.ev_charging", "unknown")
     assert "Charging:** Unavailable" in Template(content, hass).async_render()
     assert hass.states.get("number.ev_target").state == "80"
+
+
+@pytest.mark.parametrize("target", ["sensor.ev_target", "number.ev_target"])
+async def test_vehicle_target_control_matches_source(
+    hass: HomeAssistant, config_entry: MockConfigEntry, target: str
+) -> None:
+    """Only writable targets get controls, even when the vehicle is unavailable."""
+    hass.states.async_set("sensor.ev_battery", "unavailable", {"unit_of_measurement": "%"})
+    hass.states.async_set(target, "unavailable", {"unit_of_measurement": "%"})
+    await _setup(
+        hass,
+        config_entry,
+        create=True,
+        options={
+            "vehicles": [
+                {
+                    "id": "ev",
+                    "name": "EV",
+                    "battery_entity": "sensor.ev_battery",
+                    "charge_target_entity": target,
+                }
+            ]
+        },
+    )
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    section = next(s for s in config["views"][0]["sections"] if s["cards"][0].get("heading") == "Vehicles")
+    cards = section["cards"][1]["cards"]
+    controls = [card for card in cards if card["type"] == "tile"]
+    assert [card["entity"] for card in controls] == ([target] if target.startswith("number.") else [])
+    assert "Charge target:** Unavailable" in Template(cards[1]["content"], hass).async_render()
 
 
 async def test_restart_cooldown_card_uses_live_relative_deadline(
