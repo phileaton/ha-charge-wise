@@ -332,9 +332,10 @@ async def test_multiple_vehicle_cards_render_status_and_target_control(
     assert rivian["cards"][2] == {
         "type": "tile",
         "entity": "number.ev_target",
-        "name": "Charge target",
+        "name": "Rivian · Charge target",
         "features": [{"type": "numeric-input", "style": "buttons"}],
     }
+    assert rivian["cards"][1]["title"] == "Rivian"
     content = rivian["cards"][1]["content"]
     rendered = Template(content, hass).async_render()
     for expected in ("80.0 %", "Plugged in:** Yes", "Charging:** No", "4000.0 W", "269.0 mi", "90.0 min"):
@@ -372,8 +373,51 @@ async def test_vehicle_target_control_matches_source(
     section = next(s for s in config["views"][0]["sections"] if s["cards"][0].get("heading") == "Vehicles")
     cards = section["cards"][1]["cards"]
     controls = [card for card in cards if card["type"] == "tile"]
-    assert [card["entity"] for card in controls] == ([target] if target.startswith("number.") else [])
+    assert [card["entity"] for card in controls] == [target]
+    assert controls[0]["name"] == "EV · Charge target"
+    assert ("features" in controls[0]) == target.startswith("number.")
     assert "Charge target:** Unavailable" in Template(cards[1]["content"], hass).async_render()
+
+
+async def test_each_vehicle_has_its_own_named_target(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
+    """Keep each writable target paired with its vehicle across a mixed fleet."""
+    vehicles = [
+        {
+            "id": "tesla",
+            "name": "Model S",
+            "battery_entity": "sensor.tesla_soc",
+            "charge_target_entity": "number.tesla_target",
+        },
+        {
+            "id": "rivian",
+            "name": "R1S",
+            "battery_entity": "sensor.rivian_soc",
+            "charge_target_entity": "number.rivian_target",
+        },
+        {
+            "id": "other",
+            "name": "Other EV",
+            "battery_entity": "sensor.other_soc",
+            "charge_target_entity": "sensor.other_target",
+        },
+    ]
+    for vehicle in vehicles:
+        hass.states.async_set(vehicle["battery_entity"], "50", {"unit_of_measurement": "%"})
+        hass.states.async_set(vehicle["charge_target_entity"], "80", {"unit_of_measurement": "%"})
+    await _setup(hass, config_entry, create=True, options={"vehicles": vehicles})
+    config = await hass.data[LOVELACE_DATA].dashboards[URL_PATH].async_load(False)
+    section = next(s for s in config["views"][0]["sections"] if s["cards"][0].get("heading") == "Vehicles")
+    for vehicle, stack in zip(vehicles, section["cards"][1:], strict=True):
+        assert stack["cards"][0]["name"] == vehicle["name"]
+        assert stack["cards"][1]["title"] == vehicle["name"]
+        target = stack["cards"][2]
+        assert target["entity"] == vehicle["charge_target_entity"]
+        assert target["name"] == f"{vehicle['name']} · Charge target"
+        assert target.get("features") == (
+            [{"type": "numeric-input", "style": "buttons"}]
+            if vehicle["charge_target_entity"].startswith("number.")
+            else None
+        )
 
 
 async def test_restart_cooldown_card_uses_live_relative_deadline(

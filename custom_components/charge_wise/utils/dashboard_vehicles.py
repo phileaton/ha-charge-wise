@@ -109,16 +109,16 @@ def vehicle_cards(options: Mapping[str, Any], labels: Mapping[str, str]) -> list
             }
         ]
         if readings:
-            contents.append({"type": "markdown", "content": "\n\n".join(readings)})
-        if (target := vehicle.get("charge_target_entity", "")).startswith("number."):
-            contents.append(
-                {
-                    "type": "tile",
-                    "entity": target,
-                    "name": labels["charge_target_entity"],
-                    "features": [{"type": "numeric-input", "style": "buttons"}],
-                }
-            )
+            contents.append({"type": "markdown", "title": vehicle["name"], "content": "\n\n".join(readings)})
+        if target := vehicle.get("charge_target_entity"):
+            target_card: dict[str, Any] = {
+                "type": "tile",
+                "entity": target,
+                "name": f"{vehicle['name']} · {labels['charge_target_entity']}",
+            }
+            if target.startswith("number."):
+                target_card["features"] = [{"type": "numeric-input", "style": "buttons"}]
+            contents.append(target_card)
         cards.append({"type": "vertical-stack", "cards": contents, "grid_options": {"columns": 12}})
     if cards:
         cards.insert(
