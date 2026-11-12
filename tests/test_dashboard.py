@@ -338,7 +338,7 @@ async def test_multiple_vehicle_cards_render_status_and_target_control(
     assert rivian["cards"][1]["title"] == "Rivian"
     content = rivian["cards"][1]["content"]
     rendered = Template(content, hass).async_render()
-    for expected in ("80.0 %", "Plugged in:** Yes", "Charging:** No", "4000.0 W", "269.0 mi", "90.0 min"):
+    for expected in ("80.0 %", "Plugged in:** Yes", "Charging:** No", "4000.0 W", "269.0 mi", "1 h 30 min"):
         assert expected in rendered
     hass.states.async_set("sensor.ev_power", "unavailable", {"unit_of_measurement": "W"})
     assert "Charging power:** Unavailable" in Template(content, hass).async_render()
@@ -444,7 +444,34 @@ async def test_restart_cooldown_card_uses_live_relative_deadline(
         ({"sensor.ev_battery": ("40", "kWh")}, {}, "Time to finish:** Unavailable"),
         ({}, {"charging_entity": None, "connected_entity": None}, "Estimated time to target:** 4 h 0 min"),
         ({}, {"charge_target_entity": None}, "Estimated time to target:** 6 h 0 min"),
-        ({"sensor.ev_time": ("90", "min")}, {"time_remaining_entity": "sensor.ev_time"}, "Time to finish:** 90.0 min"),
+        (
+            {"sensor.ev_time": ("90", "min")},
+            {"time_remaining_entity": "sensor.ev_time"},
+            "Time to finish:** 1 h 30 min",
+        ),
+        (
+            {"sensor.ev_time": ("1379", "min")},
+            {"time_remaining_entity": "sensor.ev_time"},
+            "Time to finish:** 22 h 59 min",
+        ),
+        (
+            {"sensor.ev_time": ("5400", "s")},
+            {"time_remaining_entity": "sensor.ev_time"},
+            "Time to finish:** 1 h 30 min",
+        ),
+        ({"sensor.ev_time": ("1.5", "h")}, {"time_remaining_entity": "sensor.ev_time"}, "Time to finish:** 1 h 30 min"),
+        ({"sensor.ev_time": ("59", "s")}, {"time_remaining_entity": "sensor.ev_time"}, "Time to finish:** 0 h 1 min"),
+        (
+            {"sensor.ev_time": ("59.5", "min")},
+            {"time_remaining_entity": "sensor.ev_time"},
+            "Time to finish:** 1 h 0 min",
+        ),
+        ({"sensor.ev_time": ("0", "min")}, {"time_remaining_entity": "sensor.ev_time"}, "Time to finish:** 0 h 0 min"),
+        (
+            {"sensor.ev_time": ("1500", "min")},
+            {"time_remaining_entity": "sensor.ev_time"},
+            "Time to finish:** 25 h 0 min",
+        ),
         (
             {"sensor.ev_time": ("unavailable", "min")},
             {"time_remaining_entity": "sensor.ev_time"},

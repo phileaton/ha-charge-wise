@@ -63,7 +63,10 @@ def _time_remaining(vehicle: Mapping[str, Any], labels: Mapping[str, str]) -> st
             f"{{% set native = states('{native}') | float(none) %}}"
             f"{{% set native_unit = state_attr('{native}', 'unit_of_measurement') %}}"
             f"{{% if is_number(states('{native}')) and native >= 0 and native_unit in ['s', 'min', 'h'] %}}"
-            f"**{labels['time_remaining_entity']}:** {{{{ native | round(1) }}}} {{{{ native_unit }}}}"
+            "{% set minutes = (native / 60 if native_unit == 's' else "
+            "native * 60 if native_unit == 'h' else native) | round(0, 'ceil') | int %}"
+            f"**{labels['time_remaining_entity']}:** "
+            f"{{{{ minutes // 60 }}}} {labels['hours_unit']} {{{{ minutes % 60 }}}} {labels['minutes_unit']}"
             f"{{% else %}}{estimate}{{% endif %}}"
         )
     return estimate
