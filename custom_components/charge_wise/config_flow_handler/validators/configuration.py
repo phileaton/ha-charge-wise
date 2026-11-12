@@ -1,6 +1,7 @@
 """Per-page validation shared by the config and options flows."""
 
 from collections.abc import Callable, Mapping
+from math import isclose, isfinite
 from typing import Any
 
 from custom_components.charge_wise.config_flow_handler.schemas.windows import validate_windows
@@ -105,6 +106,29 @@ def _validate_power_units(hass: HomeAssistant, user_input: Mapping[str, Any], ke
     return {}
 
 
+def _validate_current_target(hass: HomeAssistant, user_input: Mapping[str, Any]) -> dict[str, str]:
+    """Require an ampere target that can represent every configured whole-amp command."""
+    state = hass.states.get(user_input[CONF_CURRENT_TARGET_ENTITY])
+    if state is None or state.attributes.get("unit_of_measurement") != UnitOfElectricCurrent.AMPERE:
+        return {"base": "invalid_current_unit"}
+    try:
+        lower = float(state.attributes["min"])
+        upper = float(state.attributes["max"])
+        step = float(state.attributes["step"])
+    except KeyError, TypeError, ValueError:
+        return {"base": "invalid_current_range"}
+    minimum = int(user_input[CONF_MINIMUM_CURRENT_A])
+    maximum = int(user_input[CONF_MAXIMUM_CURRENT_A])
+    if not all(isfinite(value) for value in (lower, upper, step)) or step <= 0:
+        return {"base": "invalid_current_range"}
+    if lower > minimum or upper < maximum:
+        return {"base": "invalid_current_range"}
+    counts = [(current - lower) / step for current in range(minimum, maximum + 1)]
+    if not all(isfinite(count) and isclose(count, round(count), abs_tol=1e-7) for count in counts):
+        return {"base": "invalid_current_range"}
+    return {}
+
+
 def validate_charger(
     hass: HomeAssistant,
     user_input: Mapping[str, Any],
@@ -153,6 +177,9 @@ def validate_charger(
     maximum = int(user_input[CONF_MAXIMUM_CURRENT_A])
     if minimum > maximum:
         return {"base": "invalid_limits"}
+
+    if errors := _validate_current_target(hass, user_input):
+        return errors
 
     hardware_entity = user_input.get(CONF_HARDWARE_MAXIMUM_ENTITY)
     if hardware_entity:

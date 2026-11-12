@@ -144,3 +144,6 @@ script/.lib/output.sh
 
 # Include Core's standalone validator package after the 2026.11 split.
 script/hassfest
+
+# Keep the test fixture pin aligned with the isolated test environment.
+requirements_test.txt

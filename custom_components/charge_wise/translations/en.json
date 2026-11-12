@@ -172,7 +172,8 @@
       "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty.",
       "invalid_status_mapping": "Enter at least one custom status. Values must be unique across all groups and cannot be unknown or unavailable.",
       "status_profile_required": "The supplying integration is not recognized. Select OCPP, Wallbox or Custom for this status sensor.",
-      "invalid_current_unit": "Select a measured current sensor reporting amperes (A)."
+      "invalid_current_unit": "Select a current target and any measured current sensor reporting amperes (A).",
+      "invalid_current_range": "Select a current target whose range covers the configured minimum and maximum and whose step supports every whole-amp value between them."
     },
     "abort": {
       "already_configured": "This charger is already configured."
@@ -441,13 +442,14 @@
       "ev_first_incomplete": "Set the forecast, battery level, house consumption and battery capacity together, or leave all four empty.",
       "invalid_status_mapping": "Enter at least one custom status. Values must be unique across all groups and cannot be unknown or unavailable.",
       "status_profile_required": "The supplying integration is not recognized. Select OCPP, Wallbox or Custom for this status sensor.",
-      "invalid_current_unit": "Select a measured current sensor reporting amperes (A).",
+      "invalid_current_unit": "Select a current target and any measured current sensor reporting amperes (A).",
       "vehicle_name_required": "Enter a display name.",
       "vehicle_entity_required": "Select a battery percentage sensor.",
       "vehicle_invalid_entity": "Select an existing reading of the required type.",
       "vehicle_invalid_unit": "The selected reading uses an unsupported unit. Choose a reading with the units described above.",
       "vehicle_invalid_capacity": "Enter a finite battery capacity between 0.1 and 1000 kWh.",
-      "vehicle_estimate_power_required": "Select a charging power sensor to estimate the remaining charging time."
+      "vehicle_estimate_power_required": "Select a charging power sensor to estimate the remaining charging time.",
+      "invalid_current_range": "Select a current target whose range covers the configured minimum and maximum and whose step supports every whole-amp value between them."
     }
   },
   "exceptions": {
@@ -526,7 +528,7 @@
           "solar_charging": "Charging from available solar power",
           "native_solar": "Charger-managed solar active or awaiting confirmation",
           "hardware_limit": "The hardware limit is below the minimum operating current",
-          "control_failed": "A charger command failed",
+          "control_failed": "Charger control or startup failed; check charger status and source readings",
           "ev_first": "Charging from solar, sharing the battery's charging power"
         }
       },

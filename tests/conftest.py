@@ -3,7 +3,7 @@
 from typing import Any
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, setup_test_component_platform
 
 from custom_components.charge_wise.const import (
     BATTERY_SIGN_POSITIVE,
@@ -39,8 +39,10 @@ from custom_components.charge_wise.const import (
     DEFAULT_VOLTAGE_V,
     DOMAIN,
 )
+from homeassistant.components.number import NumberEntity
 from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
 from homeassistant.core import HomeAssistant
+from homeassistant.setup import async_setup_component
 
 DEFAULT_OPTIONS: dict[str, Any] = {
     CONF_GRID_POWER_ENTITY: "sensor.grid_power",
@@ -64,6 +66,23 @@ DEFAULT_OPTIONS: dict[str, Any] = {
     CONF_CURRENT_DEADBAND_A: DEFAULT_CURRENT_DEADBAND_A,
     CONF_OFFPEAK_WINDOWS: [{"start": "00:00", "end": "06:00", "days": "all"}],
 }
+
+
+class ChargerCurrentTarget(NumberEntity):
+    """A source charger that confirms accepted current commands."""
+
+    _attr_name = "Current Limit"
+    _attr_unique_id = "test_current_limit"
+    _attr_native_value = 6
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_native_min_value = 6
+    _attr_native_max_value = 32
+    _attr_native_step = 1
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Publish a current command as the charger would."""
+        self._attr_native_value = value
+        self.async_write_ha_state()
 
 
 @pytest.fixture(autouse=True)
@@ -129,6 +148,9 @@ async def init_integration(
     config_entry: MockConfigEntry,
 ) -> MockConfigEntry:
     """Set up Charge Wise and return the loaded config entry."""
+    hass.states.async_remove("number.current_limit")
+    setup_test_component_platform(hass, "number", [ChargerCurrentTarget()])
+    assert await async_setup_component(hass, "number", {"number": [{"platform": "test"}]})
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()

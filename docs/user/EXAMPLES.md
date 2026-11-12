@@ -38,7 +38,12 @@ triggers:
 actions:
   - action: switch.turn_on
     target:
-      entity_id: switch.garage_charger_off_peak_charging
+      entity_id: switch.garage_charger_charging_enabled
+  - action: select.select_option
+    target:
+      entity_id: select.garage_charger_off_peak_charging
+    data:
+      option: "on"
 mode: single
 ```
 

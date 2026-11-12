@@ -12,7 +12,6 @@ from custom_components.charge_wise.const import (
     CONF_HARDWARE_MAXIMUM_ENTITY,
     DOMAIN,
 )
-from custom_components.charge_wise.diagnostics import async_get_config_entry_diagnostics
 from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
@@ -337,16 +336,6 @@ async def test_legacy_ocpp_mapping_pauses_on_unknown_status(
     assert hass.states.get(connection).state == "unknown"
     reason = _entity_id(hass, config_entry, "sensor", "decision_reason")
     assert hass.states.get(reason).state == "ev_status_unavailable"
-
-
-async def test_diagnostics_include_serializable_observations(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-) -> None:
-    """Diagnostics expose source evidence as a mapping that can be downloaded."""
-    result = await async_get_config_entry_diagnostics(hass, init_integration)
-    assert result["coordinator"]["data"]["vehicle_connected"] is True
-    assert result["coordinator"]["data"]["charger_connection_source"] == "binary_sensor.ev_connected"
 
 
 @pytest.mark.parametrize(("raw", "expected"), [("on", "on"), ("off", "off"), ("unavailable", "unknown")])

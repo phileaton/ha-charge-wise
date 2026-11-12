@@ -71,6 +71,7 @@ from custom_components.charge_wise.const import (
     POWER_TO_W,
 )
 from custom_components.charge_wise.coordinator.data import ChargeWiseSnapshot
+from custom_components.charge_wise.utils.charger_startup import COMMAND_CONFIRMATION, ChargeWiseStartupMonitor
 from custom_components.charge_wise.utils.charger_status import (
     ChargerObservation,
     ChargingPowerDetector,
@@ -160,6 +161,8 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         self._last_native_command: tuple[str, datetime] | None = None
         self._native_full_battery = False
         self._native_battery_store: Store[dict[str, bool]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.native_solar")
+        self._startup = ChargeWiseStartupMonitor()
+        self._last_current_command: tuple[float, datetime] | None = None
         self._unloading = False
         self.battery_configured = bool(self.options.get(CONF_BATTERY_POWER_ENTITY))
         self.ev_connected_configured = bool(charger_status_source(self.options))
@@ -384,6 +387,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         """Turn a charging source on or off; a restored source waits through the safety cooldown."""
         if self._unloading and key == "enabled" and value:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="charger_unloading")
+        if key == "enabled" and not value:
+            self._startup.reset()
+            self._last_current_command = None
+            self._last_switch_command = None
         self.switches[key] = value
         if not restoring and key == "solar_enabled" and not value:
             self._reset_ev_first()
@@ -542,11 +549,45 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             battery_reserve_w=ev_first_result.battery_reserve_w if ev_first_result else None,
         )
         decision = self.controller.evaluate(settings, readings, now)
+        already_failed = self._startup.failed
+        was_not_drawing = self._startup.not_drawing
+        if self._startup.update(
+            now,
+            requested=decision.charger_enabled,
+            native_solar=decision.reason is ChargeWiseReason.NATIVE_SOLAR,
+            target_a=decision.requested_current_a,
+            observed_a=readings.current_target_a,
+            switch_on=readings.charger_enabled,
+            charging=self.charger_observation.charging,
+            session=self.charger_observation.session,
+        ):
+            if not already_failed:
+                LOGGER.error("Charger did not confirm its current limit or start command")
+            decision = replace(
+                decision,
+                status=ControllerStatus.ERROR,
+                reason=ChargeWiseReason.CONTROL_FAILED,
+                charger_enabled=False,
+                requested_current_a=0.0,
+                next_update_at=None,
+            )
+        elif self._startup.not_drawing:
+            if not was_not_drawing:
+                LOGGER.warning("Charger accepted charging commands but is not drawing power; charging remains enabled")
+            decision = replace(decision, status=ControllerStatus.ERROR, reason=ChargeWiseReason.CONTROL_FAILED)
+        elif was_not_drawing:
+            LOGGER.info("Charger no-power condition cleared")
         self._log_decision_change(decision, readings)
         next_start_at = next_start(self.windows, local_now) if (self.offpeak_mode != "off") else None
         try:
             applied = await self._async_apply_decision(decision)
+            self._startup.confirm_commands(
+                target_a=decision.requested_current_a,
+                observed_a=self._number_value(self.options[CONF_CURRENT_TARGET_ENTITY]),
+                switch_on=self._entity_is_on(self.options[CONF_CHARGER_SWITCH_ENTITY]),
+            )
         except HomeAssistantError:
+            self._startup.fail()
             LOGGER.exception("Failed to apply charger control decision")
             await self._async_fail_safe()
             self.async_set_updated_data(
@@ -942,20 +983,39 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             current_entity = self.options[CONF_CURRENT_TARGET_ENTITY]
             current_state = self._number_value(current_entity)
             current_object = self.hass.states.get(current_entity)
-            # OCPP exposes the session limit only while a transaction runs; it is applied on the update that follows the start.
             current_unavailable = current_object is None or current_object.state == STATE_UNAVAILABLE
+            registered = er.async_get(self.hass).async_get(current_entity)
+            ocpp_session = self.charger_observation.profile == "ocpp" or (
+                registered is not None and registered.platform == "ocpp"
+            )
+            if current_unavailable and not ocpp_session:
+                if self._entity_is_on(switch_entity):
+                    await self._async_fail_safe()
+                return False
             if not current_unavailable and (
                 current_state is None or not isclose(current_state, decision.requested_current_a, abs_tol=0.01)
             ):
-                await self.hass.services.async_call(
-                    "number",
-                    "set_value",
-                    {
-                        ATTR_ENTITY_ID: current_entity,
-                        "value": decision.requested_current_a,
-                    },
-                    blocking=True,
-                )
+                now = dt_util.utcnow()
+                command = self._last_current_command
+                if (
+                    command is None
+                    or command[0] != decision.requested_current_a
+                    or now - command[1] >= COMMAND_CONFIRMATION
+                ):
+                    self._last_current_command = (decision.requested_current_a, now)
+                    await self.hass.services.async_call(
+                        "number",
+                        "set_value",
+                        {ATTR_ENTITY_ID: current_entity, "value": decision.requested_current_a},
+                        blocking=True,
+                    )
+                confirmed = self._number_value(current_entity)
+                if confirmed is None or not isclose(confirmed, decision.requested_current_a, abs_tol=0.01):
+                    if self._entity_is_on(switch_entity):
+                        await self._async_fail_safe()
+                    return False
+            if not current_unavailable:
+                self._last_current_command = None
 
         if (switch_state is None or switch_state.state != STATE_ON) and self._switch_command_due(True):
             await self.hass.services.async_call(
@@ -964,7 +1024,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 {ATTR_ENTITY_ID: switch_entity},
                 blocking=True,
             )
-        return True
+        return not current_unavailable if decision.reason is not ChargeWiseReason.NATIVE_SOLAR else True
 
     async def _async_set_native_solar(self, enabled: bool) -> bool:
         """Stop the charger while changing ownership, then wait for the mode to be confirmed."""
@@ -1044,6 +1104,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
         state = self.hass.states.get(switch_entity)
         if state is not None and state.state == STATE_OFF:
             return
+        self._last_switch_command = (False, dt_util.utcnow())
         try:
             await self.hass.services.async_call(
                 "switch",
@@ -1064,6 +1125,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 self._offpeak_until,
                 self._ev_first_until,
                 self._under_drawing_detector.next_update_at,
+                self._startup.next_update_at,
             )
             if value is not None
         ]

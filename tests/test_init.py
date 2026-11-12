@@ -92,13 +92,13 @@ async def test_offpeak_window_charges_from_the_grid_and_stops_outside_it(
 
     freezer.move_to("2026-01-07 11:00:00+00:00")
     await _turn_on(hass, init_integration, "enabled")
+    hass.services.async_register("switch", "turn_on", turn_on)
+    hass.services.async_register("switch", "turn_off", turn_off)
     mode = er.async_get(hass).async_get_entity_id("select", DOMAIN, f"{init_integration.entry_id}_offpeak_mode")
     await hass.services.async_call(
         "select", "select_option", {"entity_id": mode, "option": offpeak_mode}, blocking=True
     )
-    freezer.tick(31)
-    hass.services.async_register("switch", "turn_on", turn_on)
-    hass.services.async_register("switch", "turn_off", turn_off)
+
     await _set_offpeak_current(hass, init_integration, 10)
     await hass.async_block_till_done()
 
@@ -135,11 +135,11 @@ async def test_pending_switch_command_is_not_repeated(
 
     freezer.move_to("2026-01-07 11:00:00+00:00")
     await _turn_on(hass, init_integration, "enabled")
-    mode = er.async_get(hass).async_get_entity_id("select", DOMAIN, f"{init_integration.entry_id}_offpeak_mode")
-    await hass.services.async_call("select", "select_option", {"entity_id": mode, "option": "on"}, blocking=True)
-    freezer.tick(31)
     hass.services.async_register("switch", "turn_on", turn_on)
     hass.services.async_register("switch", "turn_off", turn_off)
+    mode = er.async_get(hass).async_get_entity_id("select", DOMAIN, f"{init_integration.entry_id}_offpeak_mode")
+    await hass.services.async_call("select", "select_option", {"entity_id": mode, "option": "on"}, blocking=True)
+
     for current in (10, 11, 12):
         await _set_offpeak_current(hass, init_integration, current)
     await hass.async_block_till_done()
@@ -148,7 +148,9 @@ async def test_pending_switch_command_is_not_repeated(
     freezer.tick(31)
     await _set_offpeak_current(hass, init_integration, 13)
     await hass.async_block_till_done()
-    assert commands == ["on", "on"]
+    assert commands == ["on"]
+    status = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{init_integration.entry_id}_controller_status")
+    assert hass.states.get(status).state == "error"
 
 
 async def test_legacy_demo_entry_has_an_actionable_setup_error(

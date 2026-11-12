@@ -59,6 +59,14 @@ Run `script/check` to lint and type-check your code before submitting, or `scrip
 
 **Local validation:** Run `script/hassfest` to validate your integration against Home Assistant's quality standards using the official validation tools. This checks manifest.json, translations, services.yaml (service action definitions), and integration structure locally before pushing to GitHub.
 
+## Automated tests
+
+Run `script/test` (or `script/test --cov-html` for coverage). Its pre-hook creates
+`.local/ha-test-venv` and installs the versions in `requirements_test.txt` and `requirements.txt`.
+The fixture package pins its compatible Home Assistant version, independently of the latest runtime used by
+`script/develop`. The first test run needs network access; later runs reuse the environment. This does not downgrade
+the development instance. Run `script/check` separately against the development runtime as well.
+
 ## AI Agent Support
 
 This project ships [agent skills](./.agents/skills/README.md) — task-triggered playbooks written against the open

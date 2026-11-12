@@ -42,6 +42,7 @@ class SessionLimit(NumberEntity):
 
     _attr_name = "Current Limit"
     _attr_unique_id = "native_test_current"
+    _attr_native_unit_of_measurement = "A"
     _attr_native_value = 6
     _attr_native_min_value = 6
     _attr_native_max_value = 32

@@ -53,3 +53,11 @@ controls. Multiple entries may share measurement sensors, but not the same charg
 
 See [Configuration](./CONFIGURATION.md) for all thresholds and controller behavior, and [Examples](./EXAMPLES.md) for
 automations and an importable dashboard.
+
+## Remove Charge Wise
+
+Turn **Charging enabled** off and confirm the charger has stopped. If native solar handoff is configured, confirm
+that native solar mode is off too. In **Settings → Devices & services**, delete the Charge Wise entry. Its generated
+dashboard is removed with it; the source charger and vehicle integrations remain installed. Remove any automations
+that reference Charge Wise entities. After deleting every entry, you can remove Charge Wise through HACS (or delete
+its `custom_components/charge_wise` directory for a manual install) and restart Home Assistant.

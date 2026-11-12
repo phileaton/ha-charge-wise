@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.charge_wise.const import CONF_OFFPEAK_WINDOWS, DOMAIN
@@ -384,3 +385,33 @@ async def test_charger_settings_preserve_vehicle_cards(hass: HomeAssistant, conf
     )
     assert result["type"] == "create_entry"
     assert result["data"]["vehicles"] == vehicles
+
+
+@pytest.mark.parametrize(
+    ("attributes", "error"),
+    [
+        ({"unit_of_measurement": "mA", "min": 6, "max": 32, "step": 1}, "invalid_current_unit"),
+        ({"min": 6, "max": 32, "step": 1}, "invalid_current_unit"),
+        ({"unit_of_measurement": "A", "min": 8, "max": 32, "step": 1}, "invalid_current_range"),
+        ({"unit_of_measurement": "A", "min": 6, "max": 16, "step": 1}, "invalid_current_range"),
+        ({"unit_of_measurement": "A", "min": 6, "max": 32, "step": 2}, "invalid_current_range"),
+        ({"unit_of_measurement": "A", "min": 6, "max": 32, "step": 0}, "invalid_current_range"),
+        ({"unit_of_measurement": "A", "min": 6, "max": 32, "step": "nan"}, "invalid_current_range"),
+        ({"unit_of_measurement": "A", "min": "nan", "max": 32, "step": 1}, "invalid_current_range"),
+        ({"unit_of_measurement": "A", "min": 6, "max": 32}, "invalid_current_range"),
+        ({"unit_of_measurement": "A", "min": 6, "max": 32, "step": 1e-320}, "invalid_current_range"),
+    ],
+)
+async def test_current_target_validation_recovers(
+    hass: HomeAssistant, config_entry: MockConfigEntry, attributes: dict[str, Any], error: str
+) -> None:
+    """Reject incompatible current targets before saving and allow correcting the selection."""
+    hass.states.async_set("number.current_limit", "6", attributes)
+    page = _pages(config_entry.options)[0]
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=page)
+    assert result["errors"] == {"base": error}
+    hass.states.async_set("number.current_limit", "6", {"unit_of_measurement": "A", "min": 0, "max": 40, "step": 0.1})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=page)
+    assert result["step_id"] == "solar"
+    assert result["errors"] == {}

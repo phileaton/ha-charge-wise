@@ -3,7 +3,7 @@
 Charge Wise uses selected Home Assistant entities as inputs and controls one charger per entry. You can change the
 entity mappings and controller limits later through the integration's **Configure** screen.
 
-Setup and **Configure** both walk five pages: **Charger** (entities and current limits), **Solar charging**,
+**Configure** first offers **Charger** settings or **Vehicles**. Setup and Charger settings walk five pages: **Charger** (entities and current limits), **Solar charging**,
 **Battery protection**, **EV-first charging** and **Off-peak windows** (with the dashboard option). The last page saves everything; nothing is
 stored if you close the dialog earlier. Pages with optional features can be submitted as they are. Home Assistant
 forms have no Back button, so pages 2 to 5 end with a **Go back to the previous page** toggle: tick it and select
@@ -25,6 +25,27 @@ forms have no Back button, so pages 2 to 5 end with a **Go back to the previous 
 The safe maximum is required even if a hardware-maximum entity is selected. If that optional entity becomes
 unavailable, the configured safe maximum still applies. Multiple Charge Wise entries may share measurement sensors,
 but cannot share a charger switch, active current target, or native solar-mode control.
+
+The writable current target must report amperes, expose minimum, maximum and step attributes, cover your entire
+configured current range, and accept every whole-amp value in that range. A target limited to 16 A cannot be used
+with a configured 32 A maximum. A 0.1 A step is supported; a 2 A step cannot represent every requested current.
+
+## Vehicle dashboard cards
+
+Open **Configure → Vehicles** to add, edit or remove vehicle cards, then choose **Save vehicles** to apply the list.
+Closing the dialog without saving keeps the previous list. Each vehicle needs a display name and battery percentage
+sensor. Optional readings include a charge target, connected and charging flags, charging power, range and native
+time remaining. Clear an optional selection to hide it. Vehicle settings do not choose which car is charging or
+change the charging controller's decisions.
+
+A charge target supplied by a writable number entity gets dashboard adjustment buttons. These directly change that
+vehicle's existing target control. A sensor target remains read-only.
+
+For vehicles without a valid native duration, select that vehicle's charging-power sensor and enter its usable
+battery capacity (0.1–1000 kWh). Charge Wise estimates time to the selected charge target, or 100% if no target is
+configured. It requires positive power and valid battery/target percentages; any configured connected and charging
+flags must be on. Missing inputs show Unavailable. The estimate assumes a constant rate and excludes charging losses
+and tapering; it does not schedule charging or guarantee a completion time. Valid native durations take precedence.
 
 ## Charger status and connection
 
@@ -199,6 +220,16 @@ protection binary sensor is created only when a battery-power entity is configur
   on each source integration to mark stale readings unavailable.
 - Sensor recovery does not change the switches. Solar only resumes after its safety checks and cooldown.
 - A failed target or switch command is reported as an error and triggers a best-effort stop command.
+- Charge Wise waits for the requested current limit before enabling a normal charger. An OCPP session limit may
+  become available only after starting its transaction; that startup is allowed a 30-second confirmation window.
+  Missing or unconfirmed current limits and unconfirmed start commands fail after 30 seconds. An unconfirmed
+  current change while charging triggers a best-effort stop while Charge Wise waits for acknowledgement.
+- If requested charging produces no measured charging activity for five minutes, Charge Wise reports Error while
+  keeping the charger enabled and its current limit in place. It does not repeat start commands or reboot the charger.
+  The error clears automatically when measured charging begins. Explicit paused/finished session statuses and native
+  solar mode are exempt from this power check. Normal safety checks and charging windows still apply.
+- After a failed or unconfirmed control command, Charge Wise holds charging off. Correct the source problem, then
+  turn **Charging enabled** off and on to retry.
 
 ## Entities
 
