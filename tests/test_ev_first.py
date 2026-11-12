@@ -273,12 +273,17 @@ async def test_energy_counter_drives_the_forecast_accuracy(hass: HomeAssistant, 
     accuracy_id = _entity_id(hass, config_entry, "sensor", "forecast_accuracy")
 
     hass.states.async_set("sensor.forecast_remaining", "16", {"unit_of_measurement": "kWh"})
-    hass.states.async_set("sensor.solar_total", "103", {"unit_of_measurement": "kWh"})
     await hass.async_block_till_done()
-    await config_entry.runtime_data.coordinator._async_evaluate()  # noqa: SLF001
+    hass.states.async_set("sensor.solar_total", "103", {"unit_of_measurement": "kWh"})
     await hass.async_block_till_done()
 
     assert float(hass.states.get(accuracy_id).state) == pytest.approx(75)
+
+    hass.states.async_set("sensor.forecast_total", "22", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+
+    assert float(hass.states.get(accuracy_id).state) == pytest.approx(50)
+    assert hass.states.get(accuracy_id).attributes["actual_vs_forecast"] == "3.0 of 6.0 kWh"
 
 
 async def test_forecast_cutoff_reaches_the_charger_stop_command(

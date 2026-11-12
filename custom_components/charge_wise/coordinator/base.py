@@ -246,8 +246,10 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 CONF_BATTERY_POWER_ENTITY,
                 CONF_EV_CONNECTED_ENTITY,
                 CONF_FORECAST_REMAINING_ENTITY,
+                CONF_FORECAST_TODAY_ENTITY,
                 CONF_BATTERY_LEVEL_ENTITY,
                 CONF_SOLAR_POWER_ENTITY,
+                CONF_SOLAR_ENERGY_ENTITY,
                 CONF_NATIVE_SOLAR_ENTITY,
             )
             if self.options.get(key)
