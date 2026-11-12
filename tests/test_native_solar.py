@@ -462,3 +462,48 @@ async def test_native_handoff_requires_a_bounded_stop_confirmation(
     assert solar.commands == ["Full solar", "Off"]
     assert hass.states.get(status).state == ("charging" if confirms_stop else "error")
     assert hass.states.get("switch.charger_enable").state == ("on" if confirms_stop else "off")
+
+
+@pytest.mark.parametrize("late_reply", [True, False])
+@pytest.mark.parametrize("input_update", [True, False])
+async def test_native_mode_timeout_allows_an_explicit_retry(
+    hass: HomeAssistant,
+    native_entry: tuple[MockConfigEntry, ChargerSolar],
+    freezer: FrozenDateTimeFactory,
+    late_reply: bool,
+    input_update: bool,
+) -> None:
+    """Expired mode commands must not poison manual recovery or permit an automatic restart."""
+    entry, solar = native_entry
+    solar.delay = True
+    await _switch(hass, entry, "enabled")
+    await _switch(hass, entry, "solar_enabled")
+    try:
+        freezer.tick(25)
+        if input_update:
+            hass.states.async_set("sensor.grid_power", "-1000", {"unit_of_measurement": "W"})
+            await hass.async_block_till_done()
+        freezer.tick(6)
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+        status = _entity_id(hass, entry, "sensor", "controller_status")
+        assert hass.states.get(status).state == "error"
+        assert hass.states.get("switch.charger_enable").state == "off"
+        solar.delay = False
+        if late_reply:
+            solar.confirm("Full solar")
+            await hass.async_block_till_done()
+        assert hass.states.get(status).state == "error"
+        assert hass.states.get("switch.charger_enable").state == "off"
+        await _switch(hass, entry, "enabled", on=False)
+        assert hass.states.get(status).state == "off"
+        await _switch(hass, entry, "enabled")
+        assert hass.states.get(status).state == "waiting"
+        assert hass.states.get("select.charger_solar").state == "Full solar"
+        assert hass.states.get("switch.charger_enable").state == "on"
+        assert solar.commands == (["Full solar", "Off", "Full solar"] if late_reply else ["Full solar", "Full solar"])
+    finally:
+        solar.delay = False
+        solar.confirm("Full solar")
+        await hass.async_block_till_done()
+        await _switch(hass, entry, "enabled", on=False)

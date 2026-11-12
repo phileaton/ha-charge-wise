@@ -1051,7 +1051,12 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
             if state.state == pending_option:
                 self._last_native_command = None
             elif (dt_util.utcnow() - sent_at).total_seconds() >= SWITCH_COMMAND_GRACE_S:
-                raise HomeAssistantError(f"Native solar control {entity_id} did not confirm its last command")
+                self._last_native_command = None
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="native_mode_confirmation_failed",
+                    translation_placeholders={"entity_id": entity_id},
+                )
             else:
                 await self._async_stop_for_native_change()
                 return False
@@ -1177,6 +1182,7 @@ class ChargeWiseDataUpdateCoordinator(DataUpdateCoordinator[ChargeWiseSnapshot])
                 self._under_drawing_detector.next_update_at,
                 self._startup.next_update_at,
                 self._native_stop_deadline if not self._startup.failed else None,
+                self._last_native_command[1] + COMMAND_CONFIRMATION if self._last_native_command is not None else None,
                 self._last_native_current_command[1] + COMMAND_CONFIRMATION
                 if self._last_native_current_command is not None
                 else None,

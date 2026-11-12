@@ -482,6 +482,9 @@
     },
     "native_stop_confirmation_failed": {
       "message": "Charger {entity_id} did not confirm stopping. Native solar control was not changed."
+    },
+    "native_mode_confirmation_failed": {
+      "message": "Native solar control {entity_id} did not confirm its last command. Check the charger, then turn Charging enabled off and on to retry."
     }
   },
   "entity": {

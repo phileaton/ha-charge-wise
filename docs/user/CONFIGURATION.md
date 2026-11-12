@@ -230,6 +230,10 @@ protection binary sensor is created only when a battery-power entity is configur
 - Before changing native solar mode, Charge Wise waits up to 30 seconds for the charger to report stopped.
   An ignored stop reports Error and leaves native mode unchanged. Stop commands remain best effort; an error does
   not mean the physical charger has stopped. Check the charger before retrying or changing its configuration.
+- Native mode commands have a fixed 30-second response window that input updates cannot extend. After a timeout,
+  correct the charger problem, then turn **Charging enabled** off and on to retry. Expired commands are cleared;
+  commands still awaiting confirmation must settle before a conflicting mode is selected. A late reply does not
+  clear the error or automatically resume charging.
 - If the charger reports enabled but produces no measured charging activity for five minutes, Charge Wise reports Error while
   keeping the charger enabled and its current limit in place. It does not repeat start commands or reboot the charger.
   The error clears automatically when measured charging begins. Explicit paused/finished session statuses and native
